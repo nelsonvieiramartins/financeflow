@@ -14,8 +14,10 @@ import ExpenseItem from '../components/expenses/ExpenseItem'
 import MonthNavigator from '../components/layout/MonthNavigator'
 import { formatCurrency } from '../lib/utils'
 
+import type { EntryType } from '../components/expenses/AddExpenseModal'
+
 interface Props {
-  onAddExpense: () => void
+  onAddExpense: (tab?: EntryType) => void
   onEditExpense: (e: Expense) => void
 }
 
@@ -36,6 +38,12 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
 
   function toggle(key: SectionKey) {
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function confirmDelete(fn: (id: string) => void, id: string) {
+    if (window.confirm('Tem certeza que deseja excluir este dado?')) {
+      fn(id)
+    }
   }
 
   function handleDragEnd(event: DragEndEvent, items: Expense[]) {
@@ -96,7 +104,7 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                 >
                   <SortableContext items={items.map(e => e.id)} strategy={verticalListSortingStrategy}>
                     {items.map(e => (
-                      <ExpenseItem key={e.id} expense={e} onEdit={onEditExpense} onDelete={deleteExpense} />
+                      <ExpenseItem key={e.id} expense={e} onEdit={onEditExpense} onDelete={(id) => confirmDelete(deleteExpense, id)} />
                     ))}
                   </SortableContext>
                 </DndContext>
@@ -104,7 +112,7 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                   <p className="text-xs text-[#5C5C72] text-center py-3">{emptyText}</p>
                 )}
                 <button
-                  onClick={onAddExpense}
+                  onClick={() => onAddExpense('expense')}
                   className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs text-primary border border-primary/30 rounded-xl hover:bg-primary/5 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" /> Adicionar
@@ -165,13 +173,19 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                         </div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-[#34D399]">+{formatCurrency(Number(inc.amount))}</p>
-                          <button onClick={() => deleteIncome(inc.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
+                          <button onClick={() => confirmDelete(deleteIncome, inc.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
                       </div>
                     ))}
                     {income.length === 0 && <p className="text-xs text-[#5C5C72] text-center py-3">Nenhuma receita</p>}
+                    <button
+                      onClick={() => onAddExpense('income')}
+                      className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs text-[#34D399] border border-[#34D399]/30 rounded-xl hover:bg-[#34D399]/5 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Adicionar
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -202,13 +216,19 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                           <p className={`text-sm font-bold ${r.received ? 'text-[#5C5C72] line-through' : 'text-[#FBBF24]'}`}>
                             {formatCurrency(Number(r.amount))}
                           </p>
-                          <button onClick={() => deleteReceivable(r.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
+                          <button onClick={() => confirmDelete(deleteReceivable, r.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
                       </div>
                     ))}
                     {receivables.length === 0 && <p className="text-xs text-[#5C5C72] text-center py-3">Nada a receber</p>}
+                    <button
+                      onClick={() => onAddExpense('receivable')}
+                      className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs text-[#FBBF24] border border-[#FBBF24]/30 rounded-xl hover:bg-[#FBBF24]/5 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Adicionar
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -234,13 +254,19 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                         <p className="text-sm font-medium text-white">{inv.description}</p>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-[#10B981]">{formatCurrency(Number(inv.amount))}</p>
-                          <button onClick={() => deleteInvestment(inv.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
+                          <button onClick={() => confirmDelete(deleteInvestment, inv.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
                       </div>
                     ))}
                     {investments.length === 0 && <p className="text-xs text-[#5C5C72] text-center py-3">Nenhum investimento</p>}
+                    <button
+                      onClick={() => onAddExpense('investment')}
+                      className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs text-[#10B981] border border-[#10B981]/30 rounded-xl hover:bg-[#10B981]/5 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Adicionar
+                    </button>
                   </div>
                 </motion.div>
               )}

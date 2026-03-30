@@ -11,16 +11,19 @@ import BottomNav from './components/layout/BottomNav'
 import FAB from './components/ui/FAB'
 import AddExpenseModal from './components/expenses/AddExpenseModal'
 import type { Expense } from './lib/types'
+import type { EntryType } from './components/expenses/AddExpenseModal'
 
 type Tab = 'dashboard' | 'lancamentos' | 'categorias' | 'perfil'
 
 function AppContent() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [modalOpen, setModalOpen] = useState(false)
+  const [modalTab, setModalTab] = useState<EntryType>('expense')
   const [editExpense, setEditExpense] = useState<Expense | null>(null)
 
-  function openAdd() {
+  function openAdd(tab: EntryType = 'expense') {
     setEditExpense(null)
+    setModalTab(tab)
     setModalOpen(true)
   }
 
@@ -61,6 +64,7 @@ function AppContent() {
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditExpense(null) }}
         editExpense={editExpense}
+        initialTab={modalTab}
       />
     </div>
   )

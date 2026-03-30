@@ -7,12 +7,13 @@ import {
   CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS, INCOME_SOURCE_LABELS,
 } from '../../lib/types'
 
-type EntryType = 'expense' | 'income' | 'receivable' | 'investment'
+export type EntryType = 'expense' | 'income' | 'receivable' | 'investment'
 
 interface Props {
   open: boolean
   onClose: () => void
   editExpense?: Expense | null
+  initialTab?: EntryType
 }
 
 const ENTRY_TABS: { id: EntryType; label: string; emoji: string }[] = [
@@ -29,7 +30,7 @@ const CATEGORIES: ExpenseCategory[] = [
 
 const INCOME_SOURCES: IncomeSource[] = ['salario', 'beneficio', 'freelance', 'investimento', 'outros']
 
-export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
+export default function AddExpenseModal({ open, onClose, editExpense, initialTab = 'expense' }: Props) {
   const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear } = useApp()
 
   const [tab, setTab] = useState<EntryType>('expense')
@@ -58,8 +59,9 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
       setNotes(editExpense.notes ?? '')
     } else {
       resetForm()
+      setTab(initialTab)
     }
-  }, [editExpense, open])
+  }, [editExpense, open, initialTab])
 
   function resetForm() {
     setAmountStr('')

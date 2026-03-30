@@ -10,7 +10,7 @@ interface Props {
 
 const tabs = [
   { id: 'dashboard' as Tab, label: 'Início', Icon: LayoutDashboard },
-  { id: 'lancamentos' as Tab, label: 'Gastos', Icon: List },
+  { id: 'lancamentos' as Tab, label: 'Lançamentos', Icon: List },
   { id: 'categorias' as Tab, label: 'Categorias', Icon: Tag },
   { id: 'perfil' as Tab, label: 'Perfil', Icon: User },
 ]

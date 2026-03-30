@@ -105,9 +105,18 @@ export default function ExpenseItem({ expense, onEdit, onDelete }: Props) {
         </div>
 
         {/* Amount + date */}
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-bold text-white">{formatCurrency(Number(expense.amount))}</p>
-          {dueDate && <p className="text-[10px] text-[#5C5C72] mt-0.5">até {dueDate}</p>}
+        <div className="text-right flex-shrink-0 flex items-center gap-3">
+          <div>
+            <p className="text-sm font-bold text-white">{formatCurrency(Number(expense.amount))}</p>
+            {dueDate && <p className="text-[10px] text-[#5C5C72] mt-0.5">até {dueDate}</p>}
+          </div>
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(expense.id); }}
+            className="text-[#F87171] opacity-50 hover:opacity-100 p-1"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </motion.div>
     </div>
