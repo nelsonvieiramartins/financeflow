@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
@@ -22,56 +22,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
-    supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
-        if (error) console.error('Supabase getSession error:', error)
-        
-        setSession(session)
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          // loadProfile will set loading to false in its finally block
-          loadProfile(session.user.id).catch(err => console.error('Failed to load profile:', err))
-        } else {
-          setLoading(false)
-        }
-      })
-      .catch(err => {
-        console.error('Unexpected error fetching session:', err)
-        setLoading(false) // Prevents infinite loading state
-      })
+    mountedRef.current = true
 
+    // HARD SAFETY TIMEOUT: loading will ALWAYS become false after 3 seconds
+    // This prevents any Supabase hang from freezing the app
+    const safetyTimer = setTimeout(() => {
+      if (mountedRef.current && loading) {
+        console.warn('[AuthContext] Safety timeout triggered — forcing loading=false')
+        setLoading(false)
+      }
+    }, 3000)
+
+    // Use ONLY onAuthStateChange (recommended by Supabase)
+    // Do NOT use getSession() - it can hang on expired tokens
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          await loadProfile(session.user.id).catch(err => console.error('Failed to load profile on auth change:', err))
+      async (_event, newSession) => {
+        if (!mountedRef.current) return
+
+        setSession(newSession)
+        setUser(newSession?.user ?? null)
+
+        if (newSession?.user) {
+          try {
+            const { data } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', newSession.user.id)
+              .single()
+            if (mountedRef.current) setProfile(data)
+          } catch (err) {
+            console.error('[AuthContext] Profile load error:', err)
+          }
         } else {
           setProfile(null)
-          setLoading(false)
         }
+
+        if (mountedRef.current) setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
-  }, [])
-
-  async function loadProfile(userId: string) {
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-      setProfile(data)
-    } finally {
-      setLoading(false)
+    return () => {
+      mountedRef.current = false
+      clearTimeout(safetyTimer)
+      subscription.unsubscribe()
     }
-  }
+  }, [])
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -88,11 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    setLoading(true)
     setProfile(null)
     setUser(null)
     setSession(null)
+    // Don't set loading=true here — let onAuthStateChange handle it
     await supabase.auth.signOut({ scope: 'local' })
+    setLoading(false)
   }
 
   async function updateProfile(data: Partial<Profile>) {
