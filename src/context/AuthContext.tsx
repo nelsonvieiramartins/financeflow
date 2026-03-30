@@ -22,25 +22,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const mountedRef = useRef(true)
+  const initializedRef = useRef(false)
 
   useEffect(() => {
-    mountedRef.current = true
+    let mounted = true
 
-    // HARD SAFETY TIMEOUT: loading will ALWAYS become false after 3 seconds
-    // This prevents any Supabase hang from freezing the app
-    const safetyTimer = setTimeout(() => {
-      if (mountedRef.current && loading) {
-        console.warn('[AuthContext] Safety timeout triggered — forcing loading=false')
-        setLoading(false)
+    async function initialize() {
+      try {
+        // Try to get existing session — with a timeout to prevent hanging
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+
+        const result = await Promise.race([sessionPromise, timeoutPromise])
+
+        if (!mounted) return
+
+        if (result && 'data' in result) {
+          const { data: { session: existingSession }, error } = result
+          if (error) {
+            console.warn('[Auth] getSession error:', error.message)
+          }
+
+          setSession(existingSession)
+          setUser(existingSession?.user ?? null)
+
+          if (existingSession?.user) {
+            try {
+              const { data } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', existingSession.user.id)
+                .single()
+              if (mounted) setProfile(data)
+            } catch (err) {
+              console.warn('[Auth] Profile load error:', err)
+            }
+          }
+        } else {
+          // Timeout hit — no session available
+          console.warn('[Auth] Session fetch timed out')
+        }
+      } catch (err) {
+        console.error('[Auth] Initialize error:', err)
+      } finally {
+        if (mounted) {
+          setLoading(false)
+          initializedRef.current = true
+        }
       }
-    }, 3000)
+    }
 
-    // Use ONLY onAuthStateChange (recommended by Supabase)
-    // Do NOT use getSession() - it can hang on expired tokens
+    initialize()
+
+    // Listen for future auth changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
-        if (!mountedRef.current) return
+        if (!mounted) return
+
+        // Skip the INITIAL_SESSION event — we handle that in initialize()
+        if (!initializedRef.current) return
 
         setSession(newSession)
         setUser(newSession?.user ?? null)
@@ -52,27 +92,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select('*')
               .eq('id', newSession.user.id)
               .single()
-            if (mountedRef.current) setProfile(data)
+            if (mounted) setProfile(data)
           } catch (err) {
-            console.error('[AuthContext] Profile load error:', err)
+            console.warn('[Auth] Profile reload error:', err)
           }
         } else {
           setProfile(null)
         }
 
-        if (mountedRef.current) setLoading(false)
+        if (mounted) setLoading(false)
       }
     )
 
     return () => {
-      mountedRef.current = false
-      clearTimeout(safetyTimer)
+      mounted = false
       subscription.unsubscribe()
     }
   }, [])
 
   async function signIn(email: string, password: string) {
+    setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setLoading(false)
+    }
+    // On success, onAuthStateChange will fire and set loading=false
     return { error: error as Error | null }
   }
 
@@ -89,7 +133,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null)
     setUser(null)
     setSession(null)
-    // Don't set loading=true here — let onAuthStateChange handle it
     await supabase.auth.signOut({ scope: 'local' })
     setLoading(false)
   }
