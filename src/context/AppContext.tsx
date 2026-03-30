@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
@@ -40,6 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [receivables, setReceivables] = useState<Receivable[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
   const [loading, setLoading] = useState(false)
+  const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!user) return
@@ -69,17 +70,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     fetchData()
   }, [fetchData])
 
+  // Debounced fetch — coalece múltiplos eventos Realtime (ex: bulk insert) em um único fetch
+  const debouncedFetch = useCallback(() => {
+    if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
+    fetchTimerRef.current = setTimeout(() => { fetchData() }, 400)
+  }, [fetchData])
+
   // Realtime subscriptions
   useEffect(() => {
     if (!user) return
     const channel = supabase.channel(`user-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${user.id}` }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'income', filter: `user_id=eq.${user.id}` }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'receivables', filter: `user_id=eq.${user.id}` }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'investments', filter: `user_id=eq.${user.id}` }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${user.id}` }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'income', filter: `user_id=eq.${user.id}` }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'receivables', filter: `user_id=eq.${user.id}` }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'investments', filter: `user_id=eq.${user.id}` }, debouncedFetch)
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [user, fetchData])
+    return () => {
+      supabase.removeChannel(channel)
+      if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
+    }
+  }, [user, debouncedFetch])
 
   // ---- Expense CRUD ----
   async function addExpense(data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
@@ -93,7 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.from('expenses').insert({ ...data, user_id: user.id })
       if (error) throw new Error(error.message)
     }
-    fetchData()
+    // Realtime dispara debouncedFetch automaticamente após o insert
   }
 
   function buildRecurringRows(
@@ -132,7 +142,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function updateExpense(id: string, data: Partial<Expense>) {
     const { error } = await supabase.from('expenses').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) throw new Error(error.message)
-    fetchData()
   }
 
   async function deleteExpense(id: string) {
@@ -146,13 +155,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return
     const { error } = await supabase.from('income').insert({ ...data, user_id: user.id })
     if (error) throw new Error(error.message)
-    fetchData()
   }
 
   async function updateIncome(id: string, data: Partial<Income>) {
     const { error } = await supabase.from('income').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) throw new Error(error.message)
-    fetchData()
   }
 
   async function deleteIncome(id: string) {
@@ -166,13 +173,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return
     const { error } = await supabase.from('receivables').insert({ ...data, user_id: user.id })
     if (error) throw new Error(error.message)
-    fetchData()
   }
 
   async function updateReceivable(id: string, data: Partial<Receivable>) {
     const { error } = await supabase.from('receivables').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
     if (error) throw new Error(error.message)
-    fetchData()
   }
 
   async function deleteReceivable(id: string) {
@@ -186,7 +191,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return
     const { error } = await supabase.from('investments').insert({ ...data, user_id: user.id })
     if (error) throw new Error(error.message)
-    fetchData()
   }
 
   async function deleteInvestment(id: string) {
