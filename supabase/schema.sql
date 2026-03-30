@@ -77,6 +77,8 @@ CREATE TABLE public.expenses (
   month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
   year INTEGER NOT NULL,
   is_recurring BOOLEAN DEFAULT FALSE, -- gasto fixo que repete todo mês
+  recurring_group_id UUID,            -- agrupa instâncias da mesma série recorrente
+  recurring_end_date DATE,            -- último mês da série (NULL = 5 anos / sem prazo)
   notes TEXT,
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),

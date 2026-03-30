@@ -36,6 +36,8 @@ export interface Expense {
   is_recurring: boolean
   notes: string | null
   sort_order: number
+  recurring_group_id: string | null
+  recurring_end_date: string | null
   created_at: string
   updated_at: string
 }

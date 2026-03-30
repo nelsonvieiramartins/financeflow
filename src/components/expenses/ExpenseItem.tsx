@@ -34,6 +34,10 @@ export default function ExpenseItem({ expense, onEdit, onDelete }: Props) {
   const catColor = CATEGORY_COLORS[expense.category] ?? '#9090A8'
   const catIcon = CATEGORY_ICONS[expense.category] ?? '📌'
   const dueDate = expense.due_date ? new Date(expense.due_date + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }) : null
+  const isRecurrent = !!expense.recurring_group_id
+  const recurEndDate = expense.recurring_end_date
+    ? new Date(expense.recurring_end_date + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+    : null
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -88,7 +92,7 @@ export default function ExpenseItem({ expense, onEdit, onDelete }: Props) {
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">{expense.description}</p>
-          <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span
               className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
               style={{ background: `${catColor}20`, color: catColor }}
@@ -101,6 +105,11 @@ export default function ExpenseItem({ expense, onEdit, onDelete }: Props) {
             >
               {PAYMENT_TYPE_LABELS[expense.payment_type]}
             </span>
+            {isRecurrent && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#6C63FF]/15 text-[#8B84FF]">
+                {recurEndDate ? `até ${recurEndDate}` : '∞'}
+              </span>
+            )}
           </div>
         </div>
 

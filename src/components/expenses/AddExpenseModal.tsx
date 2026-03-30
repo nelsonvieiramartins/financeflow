@@ -41,6 +41,9 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
   const [paymentMethod, setPaymentMethod] = useState<'pix_boleto' | 'cartao_fixo'>('pix_boleto')
   const [isFixed, setIsFixed] = useState(false)
   const [dueDate, setDueDate] = useState('')
+  const [isRecurrent, setIsRecurrent] = useState(false)
+  const [recurEndMonth, setRecurEndMonth] = useState<number>(0)
+  const [recurEndYear, setRecurEndYear] = useState<number>(0)
   const [incomeSource, setIncomeSource] = useState<IncomeSource>('salario')
   const [fromPerson, setFromPerson] = useState('')
   const [notes, setNotes] = useState('')
@@ -57,6 +60,14 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       setIsFixed(editExpense.is_recurring)
       setDueDate(editExpense.due_date ?? '')
       setNotes(editExpense.notes ?? '')
+      if (editExpense.recurring_end_date) {
+        setIsRecurrent(true)
+        const d = new Date(editExpense.recurring_end_date + 'T00:00:00')
+        setRecurEndMonth(d.getMonth() + 1)
+        setRecurEndYear(d.getFullYear())
+      } else if (editExpense.recurring_group_id) {
+        setIsRecurrent(true)
+      }
     } else {
       resetForm()
       setTab(initialTab)
@@ -70,6 +81,9 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     setPaymentMethod('pix_boleto')
     setIsFixed(false)
     setDueDate('')
+    setIsRecurrent(false)
+    setRecurEndMonth(0)
+    setRecurEndYear(0)
     setFromPerson('')
     setNotes('')
     setError('')
@@ -95,6 +109,10 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
 
     setLoading(true)
     try {
+      const recurringEndDate = (isFixed && isRecurrent && recurEndMonth > 0 && recurEndYear > 0)
+        ? `${recurEndYear}-${String(recurEndMonth).padStart(2, '0')}-01`
+        : null
+
       if (editExpense) {
         await updateExpense(editExpense.id, {
           description: description.trim(),
@@ -117,6 +135,8 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           year: currentYear,
           notes: notes || null,
           sort_order: 0,
+          recurring_group_id: (isFixed && isRecurrent) ? crypto.randomUUID() : null,
+          recurring_end_date: recurringEndDate,
         })
       } else if (tab === 'income') {
         await addIncome({
@@ -301,16 +321,66 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
               </div>
             </div>
 
-            {/* Até quando */}
-            <div>
-              <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Até quando (opcional)</label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={e => setDueDate(e.target.value)}
-                className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
-              />
-            </div>
+            {/* Recorrente (apenas para fixos) */}
+            {isFixed && (
+              <div className="bg-bg-overlay rounded-2xl p-4 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => { setIsRecurrent(v => !v); setRecurEndMonth(0); setRecurEndYear(0) }}
+                  className="w-full flex items-center justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-white text-left">Recorrente</p>
+                    <p className="text-[10px] text-[#5C5C72] text-left mt-0.5">
+                      {isRecurrent ? 'Lança automaticamente nos próximos meses' : 'Apenas este mês'}
+                    </p>
+                  </div>
+                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${isRecurrent ? 'bg-primary' : 'bg-bg-elevated'}`}>
+                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${isRecurrent ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                </button>
+
+                {isRecurrent && (
+                  <div>
+                    <p className="text-xs text-[#9090A8] font-medium mb-2">Até quando? <span className="text-[#5C5C72]">(opcional — sem data = 5 anos)</span></p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={recurEndMonth}
+                        onChange={e => setRecurEndMonth(Number(e.target.value))}
+                        className="bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-primary"
+                      >
+                        <option value={0}>Mês</option>
+                        {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m, i) => (
+                          <option key={i} value={i + 1}>{m}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        value={recurEndYear || ''}
+                        onChange={e => setRecurEndYear(Number(e.target.value))}
+                        placeholder="Ano"
+                        min={currentYear}
+                        max={currentYear + 10}
+                        className="bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Vencimento do boleto (opcional) */}
+            {!isFixed && (
+              <div>
+                <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Vencimento (opcional)</label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={e => setDueDate(e.target.value)}
+                  className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+            )}
           </>
         )}
 

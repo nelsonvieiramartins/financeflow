@@ -84,9 +84,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ---- Expense CRUD ----
   async function addExpense(data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    const { error } = await supabase.from('expenses').insert({ ...data, user_id: user.id })
-    if (error) throw new Error(error.message)
+
+    if (data.is_recurring && data.recurring_group_id) {
+      const rows = buildRecurringRows(data, user.id)
+      const { error } = await supabase.from('expenses').insert(rows)
+      if (error) throw new Error(error.message)
+    } else {
+      const { error } = await supabase.from('expenses').insert({ ...data, user_id: user.id })
+      if (error) throw new Error(error.message)
+    }
     fetchData()
+  }
+
+  function buildRecurringRows(
+    data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
+    userId: string,
+  ) {
+    const rows = []
+    let m = data.month
+    let y = data.year
+    const endDate = data.recurring_end_date ? new Date(data.recurring_end_date + 'T00:00:00') : null
+    const limit = endDate ? 120 : 60
+
+    for (let i = 0; i < limit; i++) {
+      if (endDate && new Date(y, m - 1, 1) > endDate) break
+      rows.push({
+        user_id: userId,
+        description: data.description,
+        amount: data.amount,
+        category: data.category,
+        payment_type: data.payment_type,
+        is_recurring: data.is_recurring,
+        due_date: data.due_date,
+        month: m,
+        year: y,
+        notes: data.notes,
+        sort_order: data.sort_order,
+        recurring_group_id: data.recurring_group_id,
+        recurring_end_date: data.recurring_end_date,
+      })
+      m++
+      if (m > 12) { m = 1; y++ }
+    }
+    return rows
   }
 
   async function updateExpense(id: string, data: Partial<Expense>) {
