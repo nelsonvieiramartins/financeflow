@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './context/AuthContext'
 import { AppProvider } from './context/AppContext'
@@ -68,6 +68,29 @@ function AppContent() {
 
 export default function App() {
   const { user, loading } = useAuth()
+  const [showReload, setShowReload] = useState(false)
+
+  useEffect(() => {
+    if (loading) {
+      const timer = setTimeout(() => setShowReload(true), 5000)
+      return () => clearTimeout(timer)
+    } else {
+      setShowReload(false)
+    }
+  }, [loading])
+
+  function handleForceReload() {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister()
+        }
+        window.location.reload()
+      })
+    } else {
+      window.location.reload()
+    }
+  }
 
   if (loading) {
     return (
@@ -80,6 +103,17 @@ export default function App() {
             </svg>
           </div>
           <p className="text-xs text-[#9090A8]">FinanceFlow</p>
+          
+          {showReload && (
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={handleForceReload}
+              className="mt-6 px-4 py-2 text-sm text-white bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-95"
+            >
+              Recarregar Aplicativo
+            </motion.button>
+          )}
         </div>
       </div>
     )
