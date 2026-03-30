@@ -24,19 +24,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) loadProfile(session.user.id)
-      else setLoading(false)
-    })
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) console.error('Supabase getSession error:', error)
+        
+        setSession(session)
+        setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          // loadProfile will set loading to false in its finally block
+          loadProfile(session.user.id).catch(err => console.error('Failed to load profile:', err))
+        } else {
+          setLoading(false)
+        }
+      })
+      .catch(err => {
+        console.error('Unexpected error fetching session:', err)
+        setLoading(false) // Prevents infinite loading state
+      })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
+        
         if (session?.user) {
-          await loadProfile(session.user.id)
+          await loadProfile(session.user.id).catch(err => console.error('Failed to load profile on auth change:', err))
         } else {
           setProfile(null)
           setLoading(false)
