@@ -84,63 +84,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ---- Expense CRUD ----
   async function addExpense(data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    await supabase.from('expenses').insert({ ...data, user_id: user.id })
+    const { error } = await supabase.from('expenses').insert({ ...data, user_id: user.id })
+    if (error) throw new Error(error.message)
     fetchData()
   }
 
   async function updateExpense(id: string, data: Partial<Expense>) {
-    await supabase.from('expenses').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('expenses').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw new Error(error.message)
     fetchData()
   }
 
   async function deleteExpense(id: string) {
-    await supabase.from('expenses').delete().eq('id', id)
+    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    if (error) throw new Error(error.message)
     setExpenses(prev => prev.filter(e => e.id !== id))
   }
 
   // ---- Income CRUD ----
   async function addIncome(data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    await supabase.from('income').insert({ ...data, user_id: user.id })
+    const { error } = await supabase.from('income').insert({ ...data, user_id: user.id })
+    if (error) throw new Error(error.message)
     fetchData()
   }
 
   async function updateIncome(id: string, data: Partial<Income>) {
-    await supabase.from('income').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('income').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw new Error(error.message)
     fetchData()
   }
 
   async function deleteIncome(id: string) {
-    await supabase.from('income').delete().eq('id', id)
+    const { error } = await supabase.from('income').delete().eq('id', id)
+    if (error) throw new Error(error.message)
     setIncome(prev => prev.filter(i => i.id !== id))
   }
 
   // ---- Receivables CRUD ----
   async function addReceivable(data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    await supabase.from('receivables').insert({ ...data, user_id: user.id })
+    const { error } = await supabase.from('receivables').insert({ ...data, user_id: user.id })
+    if (error) throw new Error(error.message)
     fetchData()
   }
 
   async function updateReceivable(id: string, data: Partial<Receivable>) {
-    await supabase.from('receivables').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+    const { error } = await supabase.from('receivables').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw new Error(error.message)
     fetchData()
   }
 
   async function deleteReceivable(id: string) {
-    await supabase.from('receivables').delete().eq('id', id)
+    const { error } = await supabase.from('receivables').delete().eq('id', id)
+    if (error) throw new Error(error.message)
     setReceivables(prev => prev.filter(r => r.id !== id))
   }
 
   // ---- Investments CRUD ----
   async function addInvestment(data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    await supabase.from('investments').insert({ ...data, user_id: user.id })
+    const { error } = await supabase.from('investments').insert({ ...data, user_id: user.id })
+    if (error) throw new Error(error.message)
     fetchData()
   }
 
   async function deleteInvestment(id: string) {
-    await supabase.from('investments').delete().eq('id', id)
+    const { error } = await supabase.from('investments').delete().eq('id', id)
+    if (error) throw new Error(error.message)
     setInvestments(prev => prev.filter(i => i.id !== id))
   }
 

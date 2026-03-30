@@ -145,6 +145,9 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
         })
       }
       handleClose()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao salvar. Tente novamente.'
+      setError(msg)
     } finally {
       setLoading(false)
     }
