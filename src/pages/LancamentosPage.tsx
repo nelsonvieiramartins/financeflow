@@ -30,6 +30,7 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
     updateExpense, currentMonth, currentYear, setCurrentMonth, setCurrentYear,
   } = useApp()
   const [collapsed, setCollapsed] = useState<Partial<Record<SectionKey, boolean>>>({})
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; fn: (id: string) => void } | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -40,9 +41,14 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
-  function confirmDelete(fn: (id: string) => void, id: string) {
-    if (window.confirm('Tem certeza que deseja excluir este dado?')) {
-      fn(id)
+  function requestDelete(fn: (id: string) => void, id: string) {
+    setPendingDelete({ id, fn })
+  }
+
+  function confirmPendingDelete() {
+    if (pendingDelete) {
+      pendingDelete.fn(pendingDelete.id)
+      setPendingDelete(null)
     }
   }
 
@@ -104,7 +110,7 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                 >
                   <SortableContext items={items.map(e => e.id)} strategy={verticalListSortingStrategy}>
                     {items.map(e => (
-                      <ExpenseItem key={e.id} expense={e} onEdit={onEditExpense} onDelete={(id) => confirmDelete(deleteExpense, id)} />
+                      <ExpenseItem key={e.id} expense={e} onEdit={onEditExpense} onDelete={(id) => requestDelete(deleteExpense, id)} />
                     ))}
                   </SortableContext>
                 </DndContext>
@@ -173,7 +179,7 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                         </div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-[#34D399]">+{formatCurrency(Number(inc.amount))}</p>
-                          <button onClick={() => confirmDelete(deleteIncome, inc.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
+                          <button onClick={() => requestDelete(deleteIncome, inc.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
@@ -216,7 +222,7 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                           <p className={`text-sm font-bold ${r.received ? 'text-[#5C5C72] line-through' : 'text-[#FBBF24]'}`}>
                             {formatCurrency(Number(r.amount))}
                           </p>
-                          <button onClick={() => confirmDelete(deleteReceivable, r.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
+                          <button onClick={() => requestDelete(deleteReceivable, r.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
@@ -254,7 +260,7 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                         <p className="text-sm font-medium text-white">{inv.description}</p>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-[#10B981]">{formatCurrency(Number(inv.amount))}</p>
-                          <button onClick={() => confirmDelete(deleteInvestment, inv.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
+                          <button onClick={() => requestDelete(deleteInvestment, inv.id)} className="text-[#F87171] opacity-50 hover:opacity-100">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
@@ -275,6 +281,44 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
 
         </div>
       </div>
+
+      {/* Confirmação de exclusão */}
+      <AnimatePresence>
+        {pendingDelete && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/60" onClick={() => setPendingDelete(null)} />
+            <motion.div
+              className="relative w-full max-w-lg bg-[#1A1A24] rounded-t-2xl px-4 py-5 border-t border-white/10"
+              initial={{ y: 80 }}
+              animate={{ y: 0 }}
+              exit={{ y: 80 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+            >
+              <p className="text-sm font-semibold text-white text-center mb-1">Excluir item?</p>
+              <p className="text-xs text-[#9090A8] text-center mb-4">Esta ação não pode ser desfeita.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPendingDelete(null)}
+                  className="flex-1 py-3 text-sm font-medium text-[#9090A8] bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmPendingDelete}
+                  className="flex-1 py-3 text-sm font-medium text-white bg-[#F87171]/20 text-[#F87171] rounded-xl hover:bg-[#F87171]/30 transition-colors"
+                >
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
