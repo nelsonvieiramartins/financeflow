@@ -4,8 +4,7 @@ import BottomSheet from '../ui/BottomSheet'
 import { useApp } from '../../context/AppContext'
 import type { Expense, ExpenseCategory, PaymentType, IncomeSource } from '../../lib/types'
 import {
-  CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS,
-  PAYMENT_TYPE_LABELS,
+  CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS, INCOME_SOURCE_LABELS,
 } from '../../lib/types'
 
 type EntryType = 'expense' | 'income' | 'receivable' | 'investment'
@@ -17,10 +16,10 @@ interface Props {
 }
 
 const ENTRY_TABS: { id: EntryType; label: string; emoji: string }[] = [
-  { id: 'expense', label: 'Gasto', emoji: '💸' },
-  { id: 'income', label: 'Receita', emoji: '💰' },
-  { id: 'receivable', label: 'A Receber', emoji: '🤝' },
-  { id: 'investment', label: 'Investimento', emoji: '📈' },
+  { id: 'expense',    label: 'Gasto',        emoji: '💸' },
+  { id: 'income',     label: 'Receita',       emoji: '💰' },
+  { id: 'receivable', label: 'A Receber',     emoji: '🤝' },
+  { id: 'investment', label: 'Investimento',  emoji: '📈' },
 ]
 
 const CATEGORIES: ExpenseCategory[] = [
@@ -28,15 +27,7 @@ const CATEGORIES: ExpenseCategory[] = [
   'entretenimento', 'saude', 'beleza', 'casa', 'compras', 'outros',
 ]
 
-const PAYMENT_TYPES: PaymentType[] = ['pix_boleto', 'cartao_fixo', 'variavel']
-
-const INCOME_SOURCES: { id: IncomeSource; label: string }[] = [
-  { id: 'salario', label: 'Salário' },
-  { id: 'beneficio', label: 'Benefício' },
-  { id: 'freelance', label: 'Freelance' },
-  { id: 'investimento', label: 'Investimento' },
-  { id: 'outros', label: 'Outros' },
-]
+const INCOME_SOURCES: IncomeSource[] = ['salario', 'beneficio', 'freelance', 'investimento', 'outros']
 
 export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
   const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear } = useApp()
@@ -45,7 +36,9 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
   const [amountStr, setAmountStr] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<ExpenseCategory>('outros')
-  const [paymentType, setPaymentType] = useState<PaymentType>('variavel')
+  // Separado em método (pix/cartão) + tipo (fixo/variável)
+  const [paymentMethod, setPaymentMethod] = useState<'pix_boleto' | 'cartao_fixo'>('pix_boleto')
+  const [isFixed, setIsFixed] = useState(false)
   const [dueDate, setDueDate] = useState('')
   const [incomeSource, setIncomeSource] = useState<IncomeSource>('salario')
   const [fromPerson, setFromPerson] = useState('')
@@ -59,7 +52,8 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
       setDescription(editExpense.description)
       setAmountStr(String(editExpense.amount).replace('.', ','))
       setCategory(editExpense.category)
-      setPaymentType(editExpense.payment_type)
+      setPaymentMethod(editExpense.payment_type === 'cartao_fixo' ? 'cartao_fixo' : 'pix_boleto')
+      setIsFixed(editExpense.is_recurring)
       setDueDate(editExpense.due_date ?? '')
       setNotes(editExpense.notes ?? '')
     } else {
@@ -71,17 +65,15 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
     setAmountStr('')
     setDescription('')
     setCategory('outros')
-    setPaymentType('variavel')
+    setPaymentMethod('pix_boleto')
+    setIsFixed(false)
     setDueDate('')
     setFromPerson('')
     setNotes('')
     setError('')
   }
 
-  function handleClose() {
-    resetForm()
-    onClose()
-  }
+  function handleClose() { resetForm(); onClose() }
 
   function formatAmount(val: string) {
     const digits = val.replace(/\D/g, '')
@@ -106,7 +98,8 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
           description: description.trim(),
           amount,
           category,
-          payment_type: paymentType,
+          payment_type: paymentMethod as PaymentType,
+          is_recurring: isFixed,
           due_date: dueDate || null,
           notes: notes || null,
         })
@@ -115,11 +108,11 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
           description: description.trim(),
           amount,
           category,
-          payment_type: paymentType,
+          payment_type: paymentMethod as PaymentType,
+          is_recurring: isFixed,
           due_date: dueDate || null,
           month: currentMonth,
           year: currentYear,
-          is_recurring: paymentType !== 'variavel',
           notes: notes || null,
           sort_order: 0,
         })
@@ -157,12 +150,18 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
     }
   }
 
-  const title = editExpense ? 'Editar Lançamento' : 'Novo Lançamento'
+  const sectionLabel = (() => {
+    if (tab !== 'expense') return null
+    const tipo = isFixed ? 'Fixo' : 'Variável'
+    const metodo = paymentMethod === 'pix_boleto' ? 'Pix/Boleto' : 'Cartão'
+    return `${tipo} · ${metodo}`
+  })()
 
   return (
-    <BottomSheet open={open} onClose={handleClose} title={title}>
+    <BottomSheet open={open} onClose={handleClose} title={editExpense ? 'Editar Lançamento' : 'Novo Lançamento'}>
       <div className="space-y-4">
-        {/* Entry type tabs (only when adding) */}
+
+        {/* Entry type tabs */}
         {!editExpense && (
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {ENTRY_TABS.map(t => (
@@ -170,9 +169,7 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
                 key={t.id}
                 onClick={() => { setTab(t.id); setError('') }}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                  tab === t.id
-                    ? 'bg-gradient-primary text-white shadow-glow-sm'
-                    : 'bg-bg-overlay text-[#9090A8]'
+                  tab === t.id ? 'bg-gradient-primary text-white shadow-glow-sm' : 'bg-bg-overlay text-[#9090A8]'
                 }`}
               >
                 <span>{t.emoji}</span> {t.label}
@@ -181,8 +178,11 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
           </div>
         )}
 
-        {/* Amount */}
+        {/* Valor */}
         <div className="bg-bg-overlay rounded-2xl p-4 text-center">
+          {sectionLabel && (
+            <p className="text-[10px] text-primary font-medium uppercase tracking-wider mb-1">{sectionLabel}</p>
+          )}
           <p className="text-xs text-[#9090A8] mb-1">Valor</p>
           <div className="flex items-center justify-center gap-1">
             <span className="text-2xl text-[#9090A8] font-light">R$</span>
@@ -197,71 +197,106 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
           </div>
         </div>
 
-        {/* Description */}
+        {/* Descrição */}
         <div>
           <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Descrição</label>
           <input
             type="text"
             value={description}
             onChange={e => setDescription(e.target.value)}
-            placeholder={tab === 'income' ? 'Ex: Salário março' : tab === 'receivable' ? 'Ex: Aluguel do carro' : 'Ex: Supermercado'}
+            placeholder={
+              tab === 'income' ? 'Ex: Salário março' :
+              tab === 'receivable' ? 'Ex: Aluguel do carro' :
+              'Ex: Supermercado'
+            }
             className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
           />
         </div>
 
-        {/* Expense-specific fields */}
+        {/* Campos de despesa */}
         {(tab === 'expense' || editExpense) && (
           <>
-            {/* Category */}
+            {/* Categoria */}
             <div>
               <label className="text-xs text-[#9090A8] font-medium mb-2 block">Categoria</label>
               <div className="grid grid-cols-5 gap-2">
                 {CATEGORIES.map(cat => {
                   const color = CATEGORY_COLORS[cat]
-                  const icon = CATEGORY_ICONS[cat]
                   const isActive = category === cat
                   return (
                     <motion.button
                       key={cat}
                       onClick={() => setCategory(cat)}
                       whileTap={{ scale: 0.92 }}
-                      className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all border ${
-                        isActive ? 'border-opacity-60' : 'border-transparent'
-                      }`}
+                      className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all border"
                       style={{
                         background: isActive ? `${color}20` : 'rgba(46,46,66,0.5)',
                         borderColor: isActive ? color : 'transparent',
                       }}
                     >
-                      <span className="text-lg leading-none">{icon}</span>
-                      <span className="text-[9px] text-[#9090A8] leading-tight text-center">{CATEGORY_LABELS[cat].split('/')[0]}</span>
+                      <span className="text-lg leading-none">{CATEGORY_ICONS[cat]}</span>
+                      <span className="text-[9px] text-[#9090A8] leading-tight text-center">
+                        {CATEGORY_LABELS[cat].split('/')[0].slice(0, 8)}
+                      </span>
                     </motion.button>
                   )
                 })}
               </div>
             </div>
 
-            {/* Payment type */}
+            {/* Fixo ou Variável */}
             <div>
               <label className="text-xs text-[#9090A8] font-medium mb-2 block">Tipo</label>
-              <div className="flex gap-2">
-                {PAYMENT_TYPES.map(pt => (
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: true,  label: 'Fixo',     desc: 'Todo mês',    color: '#A78BFA' },
+                  { value: false, label: 'Variável',  desc: 'Eventual',    color: '#FF9A3C' },
+                ].map(opt => (
                   <button
-                    key={pt}
-                    onClick={() => setPaymentType(pt)}
-                    className={`flex-1 py-2.5 text-xs font-medium rounded-xl transition-all border ${
-                      paymentType === pt
-                        ? 'bg-gradient-primary text-white border-transparent shadow-glow-sm'
-                        : 'bg-bg-overlay text-[#9090A8] border-white/5'
-                    }`}
+                    key={String(opt.value)}
+                    onClick={() => setIsFixed(opt.value)}
+                    className="flex flex-col items-center py-3 rounded-xl border transition-all"
+                    style={{
+                      background: isFixed === opt.value ? `${opt.color}15` : 'rgba(46,46,66,0.5)',
+                      borderColor: isFixed === opt.value ? opt.color : 'transparent',
+                    }}
                   >
-                    {PAYMENT_TYPE_LABELS[pt]}
+                    <span className="text-sm font-semibold" style={{ color: isFixed === opt.value ? opt.color : '#9090A8' }}>
+                      {opt.label}
+                    </span>
+                    <span className="text-[10px] text-[#5C5C72]">{opt.desc}</span>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Due date */}
+            {/* Pix/Boleto ou Cartão */}
+            <div>
+              <label className="text-xs text-[#9090A8] font-medium mb-2 block">Método de pagamento</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'pix_boleto' as const, label: 'Pix / Boleto', emoji: '📲', color: '#FF6B6B' },
+                  { value: 'cartao_fixo' as const, label: 'Cartão',       emoji: '💳', color: '#6C63FF' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setPaymentMethod(opt.value)}
+                    className="flex flex-col items-center py-3 rounded-xl border transition-all"
+                    style={{
+                      background: paymentMethod === opt.value ? `${opt.color}15` : 'rgba(46,46,66,0.5)',
+                      borderColor: paymentMethod === opt.value ? opt.color : 'transparent',
+                    }}
+                  >
+                    <span className="text-xl mb-0.5">{opt.emoji}</span>
+                    <span className="text-xs font-medium" style={{ color: paymentMethod === opt.value ? opt.color : '#9090A8' }}>
+                      {opt.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Até quando */}
             <div>
               <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Até quando (opcional)</label>
               <input
@@ -274,29 +309,29 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
           </>
         )}
 
-        {/* Income source */}
+        {/* Fonte da receita */}
         {tab === 'income' && !editExpense && (
           <div>
             <label className="text-xs text-[#9090A8] font-medium mb-2 block">Fonte</label>
             <div className="flex flex-wrap gap-2">
               {INCOME_SOURCES.map(s => (
                 <button
-                  key={s.id}
-                  onClick={() => setIncomeSource(s.id)}
+                  key={s}
+                  onClick={() => setIncomeSource(s)}
                   className={`px-3 py-2 text-xs rounded-xl transition-all ${
-                    incomeSource === s.id
+                    incomeSource === s
                       ? 'bg-[#34D399]/20 text-[#34D399] border border-[#34D399]/40'
                       : 'bg-bg-overlay text-[#9090A8] border border-transparent'
                   }`}
                 >
-                  {s.label}
+                  {INCOME_SOURCE_LABELS[s]}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Receivable: from person */}
+        {/* De quem (A Receber) */}
         {tab === 'receivable' && !editExpense && (
           <div>
             <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">De quem</label>
@@ -310,7 +345,7 @@ export default function AddExpenseModal({ open, onClose, editExpense }: Props) {
           </div>
         )}
 
-        {/* Notes */}
+        {/* Observações */}
         <div>
           <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Observações (opcional)</label>
           <textarea
