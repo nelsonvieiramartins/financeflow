@@ -6,6 +6,7 @@ import MonthNavigator from '../components/layout/MonthNavigator'
 import BalanceCard from '../components/dashboard/BalanceCard'
 import CategoryChart from '../components/dashboard/CategoryChart'
 import QuickStats from '../components/dashboard/QuickStats'
+import JurosBar from '../components/dashboard/JurosBar'
 import { getInitials } from '../lib/utils'
 import { MONTHS } from '../lib/types'
 
@@ -53,6 +54,9 @@ export default function DashboardPage() {
 
           {/* Quick Stats */}
           <QuickStats expenses={expenses} receivables={receivables} />
+
+          {/* Juros Bar — aparece só quando há juros registrados no mês */}
+          <JurosBar expenses={expenses} />
 
           {/* Category Chart */}
           {expenses.length > 0 && <CategoryChart expenses={expenses} />}

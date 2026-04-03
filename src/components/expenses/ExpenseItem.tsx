@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
-import { Pencil, Trash2, GripVertical } from 'lucide-react'
+import { Pencil, Trash2, GripVertical, CheckCircle2, Circle } from 'lucide-react'
 import type { Expense } from '../../lib/types'
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, PAYMENT_TYPE_LABELS, PAYMENT_TYPE_COLORS } from '../../lib/types'
 import { formatCurrency } from '../../lib/utils'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import DarBaixaSheet from './DarBaixaSheet'
 
 interface Props {
   expense: Expense
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export default function ExpenseItem({ expense, onEdit, onDelete }: Props) {
+  const [baixaOpen, setBaixaOpen] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: expense.id })
   const x = useMotionValue(0)
 
@@ -39,6 +42,9 @@ export default function ExpenseItem({ expense, onEdit, onDelete }: Props) {
     ? new Date(expense.recurring_end_date + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
     : null
 
+  const isPaid = !!expense.data_pagamento_real
+  const hasJuros = Number(expense.valor_juros ?? 0) > 0
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -47,78 +53,107 @@ export default function ExpenseItem({ expense, onEdit, onDelete }: Props) {
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="relative overflow-hidden rounded-xl">
-      {/* Swipe hints */}
-      <motion.div className="absolute inset-0 rounded-xl pointer-events-none" style={{ background: bgDelete }} />
-      <motion.div className="absolute inset-0 rounded-xl pointer-events-none" style={{ background: bgEdit }} />
+    <>
+      <div ref={setNodeRef} style={style} className="relative overflow-hidden rounded-xl">
+        {/* Swipe hints */}
+        <motion.div className="absolute inset-0 rounded-xl pointer-events-none" style={{ background: bgDelete }} />
+        <motion.div className="absolute inset-0 rounded-xl pointer-events-none" style={{ background: bgEdit }} />
 
-      {/* Delete icon (right swipe reveals left) */}
-      <motion.div
-        className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
-        style={{ opacity: deleteOpacity }}
-      >
-        <Trash2 className="w-5 h-5 text-[#F87171]" />
-      </motion.div>
-
-      {/* Edit icon (left swipe reveals right) */}
-      <motion.div
-        className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-        style={{ opacity: editOpacity }}
-      >
-        <Pencil className="w-5 h-5 text-[#60A5FA]" />
-      </motion.div>
-
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: -100, right: 100 }}
-        dragElastic={0.2}
-        style={{ x }}
-        onDragEnd={handleDragEnd}
-        className="flex items-center gap-3 p-3.5 bg-bg-surface rounded-xl border border-white/[0.05] cursor-grab active:cursor-grabbing select-none"
-      >
-        {/* Drag handle */}
-        <div {...listeners} {...attributes} className="flex-shrink-0 touch-none cursor-grab">
-          <GripVertical className="w-4 h-4 text-[#5C5C72]" />
-        </div>
-
-        {/* Category icon */}
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
-          style={{ background: `${catColor}20` }}
+        {/* Delete icon (swipe left) */}
+        <motion.div
+          className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ opacity: deleteOpacity }}
         >
-          {catIcon}
-        </div>
+          <Trash2 className="w-5 h-5 text-[#F87171]" />
+        </motion.div>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{expense.description}</p>
-          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span
-              className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-              style={{ background: `${catColor}20`, color: catColor }}
-            >
-              {CATEGORY_LABELS[expense.category]}
-            </span>
-            <span
-              className="text-[10px] px-1.5 py-0.5 rounded-full"
-              style={{ background: `${PAYMENT_TYPE_COLORS[expense.payment_type]}15`, color: PAYMENT_TYPE_COLORS[expense.payment_type] }}
-            >
-              {PAYMENT_TYPE_LABELS[expense.payment_type]}
-            </span>
-            {isRecurrent && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#6C63FF]/15 text-[#8B84FF]">
-                {recurEndDate ? `até ${recurEndDate}` : '∞'}
-              </span>
-            )}
+        {/* Edit icon (swipe right) */}
+        <motion.div
+          className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ opacity: editOpacity }}
+        >
+          <Pencil className="w-5 h-5 text-[#60A5FA]" />
+        </motion.div>
+
+        <motion.div
+          drag="x"
+          dragConstraints={{ left: -100, right: 100 }}
+          dragElastic={0.2}
+          style={{ x }}
+          onDragEnd={handleDragEnd}
+          className="flex items-center gap-3 p-3.5 bg-bg-surface rounded-xl border border-white/[0.05] cursor-grab active:cursor-grabbing select-none"
+        >
+          {/* Drag handle */}
+          <div {...listeners} {...attributes} className="flex-shrink-0 touch-none cursor-grab">
+            <GripVertical className="w-4 h-4 text-[#5C5C72]" />
           </div>
-        </div>
 
-        {/* Amount + date */}
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-bold text-white">{formatCurrency(Number(expense.amount))}</p>
-          {dueDate && <p className="text-[10px] text-[#5C5C72] mt-0.5">até {dueDate}</p>}
-        </div>
-      </motion.div>
-    </div>
+          {/* Category icon */}
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
+            style={{ background: `${catColor}20` }}
+          >
+            {catIcon}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-medium truncate ${isPaid ? 'text-[#9090A8]' : 'text-white'}`}>
+              {expense.description}
+            </p>
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{ background: `${catColor}20`, color: catColor }}
+              >
+                {CATEGORY_LABELS[expense.category]}
+              </span>
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded-full"
+                style={{ background: `${PAYMENT_TYPE_COLORS[expense.payment_type]}15`, color: PAYMENT_TYPE_COLORS[expense.payment_type] }}
+              >
+                {PAYMENT_TYPE_LABELS[expense.payment_type]}
+              </span>
+              {isRecurrent && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#6C63FF]/15 text-[#8B84FF]">
+                  {recurEndDate ? `até ${recurEndDate}` : '∞'}
+                </span>
+              )}
+              {hasJuros && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F87171]/15 text-[#F87171]">
+                  +{formatCurrency(Number(expense.valor_juros))} juros
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Amount + payment status */}
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            {expense.is_recurring && (
+              <button
+                onPointerDown={e => e.stopPropagation()}
+                onClick={() => setBaixaOpen(true)}
+                className="flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-90"
+              >
+                {isPaid
+                  ? <CheckCircle2 className="w-5 h-5 text-[#34D399]" />
+                  : <Circle className="w-5 h-5 text-[#5C5C72]" />
+                }
+              </button>
+            )}
+            <p className={`text-sm font-bold ${isPaid ? 'text-[#5C5C72] line-through' : 'text-white'}`}>
+              {formatCurrency(Number(expense.amount))}
+            </p>
+            {dueDate && <p className="text-[10px] text-[#5C5C72]">até {dueDate}</p>}
+          </div>
+        </motion.div>
+      </div>
+
+      <DarBaixaSheet
+        expense={expense}
+        open={baixaOpen}
+        onClose={() => setBaixaOpen(false)}
+      />
+    </>
   )
 }

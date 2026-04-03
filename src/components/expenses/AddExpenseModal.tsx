@@ -137,6 +137,9 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           sort_order: 0,
           recurring_group_id: (isFixed && isRecurrent) ? crypto.randomUUID() : null,
           recurring_end_date: recurringEndDate,
+          data_pagamento_real: null,
+          valor_pago: null,
+          valor_juros: null,
         })
       } else if (tab === 'income') {
         await addIncome({

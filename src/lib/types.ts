@@ -38,6 +38,9 @@ export interface Expense {
   sort_order: number
   recurring_group_id: string | null
   recurring_end_date: string | null
+  data_pagamento_real: string | null
+  valor_pago: number | null
+  valor_juros: number | null
   created_at: string
   updated_at: string
 }

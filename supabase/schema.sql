@@ -79,6 +79,9 @@ CREATE TABLE public.expenses (
   is_recurring BOOLEAN DEFAULT FALSE, -- gasto fixo que repete todo mês
   recurring_group_id UUID,            -- agrupa instâncias da mesma série recorrente
   recurring_end_date DATE,            -- último mês da série (NULL = 5 anos / sem prazo)
+  data_pagamento_real DATE,           -- data em que o boleto foi efetivamente pago
+  valor_pago DECIMAL(12,2),           -- valor real pago (pode incluir juros/multa)
+  valor_juros DECIMAL(12,2),          -- diferença: valor_pago - amount (juros acumulados)
   notes TEXT,
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
