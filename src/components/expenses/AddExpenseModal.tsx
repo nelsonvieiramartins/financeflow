@@ -44,6 +44,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
   const [isRecurrent, setIsRecurrent] = useState(false)
   const [recurEndMonth, setRecurEndMonth] = useState<number>(0)
   const [recurEndYear, setRecurEndYear] = useState<number>(0)
+  const [dueDay, setDueDay] = useState<number>(0)
   const [incomeSource, setIncomeSource] = useState<IncomeSource>('salario')
   const [fromPerson, setFromPerson] = useState('')
   const [notes, setNotes] = useState('')
@@ -68,6 +69,9 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       } else if (editExpense.recurring_group_id) {
         setIsRecurrent(true)
       }
+      if (editExpense.due_date && editExpense.is_recurring) {
+        setDueDay(parseInt(editExpense.due_date.split('-')[2]))
+      }
     } else {
       resetForm()
       setTab(initialTab)
@@ -84,6 +88,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     setIsRecurrent(false)
     setRecurEndMonth(0)
     setRecurEndYear(0)
+    setDueDay(0)
     setFromPerson('')
     setNotes('')
     setError('')
@@ -113,6 +118,12 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
         ? `${recurEndYear}-${String(recurEndMonth).padStart(2, '0')}-01`
         : null
 
+      // Para gastos fixos recorrentes, due_date é calculado por mês no buildRecurringRows
+      // Aqui definimos o dia base para o mês atual
+      const computedDueDate = isFixed && isRecurrent && dueDay > 0
+        ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
+        : dueDate || null
+
       if (editExpense) {
         await updateExpense(editExpense.id, {
           description: description.trim(),
@@ -120,7 +131,9 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           category,
           payment_type: paymentMethod as PaymentType,
           is_recurring: isFixed,
-          due_date: dueDate || null,
+          due_date: isFixed && dueDay > 0
+            ? `${editExpense.year}-${String(editExpense.month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
+            : dueDate || null,
           notes: notes || null,
         })
       } else if (tab === 'expense') {
@@ -130,7 +143,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           category,
           payment_type: paymentMethod as PaymentType,
           is_recurring: isFixed,
-          due_date: dueDate || null,
+          due_date: computedDueDate,
           month: currentMonth,
           year: currentYear,
           notes: notes || null,
@@ -344,7 +357,23 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
                 </button>
 
                 {isRecurrent && (
-                  <div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-[#9090A8] font-medium mb-2">Dia do vencimento <span className="text-[#5C5C72]">(opcional)</span></p>
+                      <input
+                        type="number"
+                        value={dueDay || ''}
+                        onChange={e => {
+                          const v = Math.min(31, Math.max(0, Number(e.target.value)))
+                          setDueDay(v)
+                        }}
+                        placeholder="Ex: 15"
+                        min={1}
+                        max={31}
+                        className="w-full bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
                     <p className="text-xs text-[#9090A8] font-medium mb-2">Até quando? <span className="text-[#5C5C72]">(opcional — sem data = 5 anos)</span></p>
                     <div className="grid grid-cols-2 gap-2">
                       <select
@@ -366,6 +395,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
                         max={currentYear + 10}
                         className="bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary"
                       />
+                    </div>
                     </div>
                   </div>
                 )}

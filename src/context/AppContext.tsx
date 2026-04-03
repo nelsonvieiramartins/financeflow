@@ -116,6 +116,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let y = data.year
     const endDate = data.recurring_end_date ? new Date(data.recurring_end_date + 'T00:00:00') : null
     const limit = endDate ? 120 : 60
+    // Extrai o dia de vencimento do due_date base (ex: "2025-04-15" → 15)
+    const dueDateDay = data.due_date ? parseInt(data.due_date.split('-')[2]) : null
 
     for (let i = 0; i < limit; i++) {
       if (endDate && new Date(y, m - 1, 1) > endDate) break
@@ -126,7 +128,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         category: data.category,
         payment_type: data.payment_type,
         is_recurring: data.is_recurring,
-        due_date: data.due_date,
+        due_date: dueDateDay
+          ? `${y}-${String(m).padStart(2, '0')}-${String(dueDateDay).padStart(2, '0')}`
+          : null,
         month: m,
         year: y,
         notes: data.notes,
