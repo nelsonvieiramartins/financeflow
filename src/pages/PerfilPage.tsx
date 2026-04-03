@@ -4,7 +4,7 @@ import { LogOut, ChevronRight, Bell, Shield, HelpCircle, Moon, CreditCard, Plus,
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import BottomSheet from '../components/ui/BottomSheet'
-import { getInitials } from '../lib/utils'
+import { getInitials, getCardClosingDay } from '../lib/utils'
 import type { CreditCard as CreditCardType } from '../lib/types'
 
 interface CardFormState {
@@ -226,7 +226,9 @@ export default function PerfilPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">{card.name}</p>
                         <p className="text-xs text-[#9090A8]">
-                          {card.closing_day ? `Fecha dia ${card.closing_day} · ` : ''}Vence dia {card.due_day}
+                          Fecha dia {getCardClosingDay(card.due_day, card.closing_day)}
+                          {!card.closing_day && <span className="text-[#5C5C72]">*</span>}
+                          {' · '}Vence dia {card.due_day}
                           {card.last_four ? ` · •••• ${card.last_four}` : ''}
                         </p>
                       </div>
@@ -310,15 +312,15 @@ export default function PerfilPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
-                Fechamento <span className="text-[#5C5C72]">(opcional)</span>
-              </label>
+              <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Fechamento</label>
               <input
                 type="number"
                 inputMode="numeric"
                 value={cardForm.closing_day}
                 onChange={e => setCardForm(f => ({ ...f, closing_day: e.target.value }))}
-                placeholder="Ex: 3"
+                placeholder={cardForm.due_day
+                  ? `Padrão: ${getCardClosingDay(parseInt(cardForm.due_day) || 10, null)}`
+                  : 'Ex: 3'}
                 min={1}
                 max={31}
                 className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
@@ -338,6 +340,11 @@ export default function PerfilPage() {
               />
             </div>
           </div>
+          {!cardForm.closing_day && cardForm.due_day && (
+            <p className="text-[10px] text-[#5C5C72] -mt-2">
+              * Fechamento calculado: dia {getCardClosingDay(parseInt(cardForm.due_day) || 10, null)} · Ciclo de 40 dias
+            </p>
+          )}
 
           <div>
             <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
