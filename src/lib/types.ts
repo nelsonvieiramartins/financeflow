@@ -28,6 +28,7 @@ export interface CreditCard {
   user_id: string
   name: string
   due_day: number
+  closing_day: number | null
   last_four: string | null
   created_at: string
   updated_at: string

@@ -9,11 +9,12 @@ import type { CreditCard as CreditCardType } from '../lib/types'
 
 interface CardFormState {
   name: string
+  closing_day: string
   due_day: string
   last_four: string
 }
 
-const emptyForm: CardFormState = { name: '', due_day: '', last_four: '' }
+const emptyForm: CardFormState = { name: '', closing_day: '', due_day: '', last_four: '' }
 
 export default function PerfilPage() {
   const { profile, user, signOut, updateProfile } = useAuth()
@@ -48,6 +49,7 @@ export default function PerfilPage() {
     setEditingCard(card)
     setCardForm({
       name: card.name,
+      closing_day: card.closing_day ? String(card.closing_day) : '',
       due_day: String(card.due_day),
       last_four: card.last_four ?? '',
     })
@@ -60,6 +62,8 @@ export default function PerfilPage() {
     if (!cardForm.name.trim()) { setCardError('Informe o nome do cartão.'); return }
     const dueDay = parseInt(cardForm.due_day)
     if (!dueDay || dueDay < 1 || dueDay > 31) { setCardError('Informe um dia de vencimento válido (1-31).'); return }
+    const closingDay = cardForm.closing_day ? parseInt(cardForm.closing_day) : null
+    if (closingDay !== null && (closingDay < 1 || closingDay > 31)) { setCardError('Informe um dia de fechamento válido (1-31).'); return }
     const lastFour = cardForm.last_four.trim()
     if (lastFour && !/^\d{4}$/.test(lastFour)) { setCardError('Os últimos 4 dígitos devem ser numéricos.'); return }
 
@@ -67,6 +71,7 @@ export default function PerfilPage() {
     try {
       const data = {
         name: cardForm.name.trim(),
+        closing_day: closingDay,
         due_day: dueDay,
         last_four: lastFour || null,
       }
@@ -221,7 +226,7 @@ export default function PerfilPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">{card.name}</p>
                         <p className="text-xs text-[#9090A8]">
-                          Vence dia {card.due_day}
+                          {card.closing_day ? `Fecha dia ${card.closing_day} · ` : ''}Vence dia {card.due_day}
                           {card.last_four ? ` · •••• ${card.last_four}` : ''}
                         </p>
                       </div>
@@ -303,18 +308,35 @@ export default function PerfilPage() {
             />
           </div>
 
-          <div>
-            <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Dia do vencimento *</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={cardForm.due_day}
-              onChange={e => setCardForm(f => ({ ...f, due_day: e.target.value }))}
-              placeholder="Ex: 10"
-              min={1}
-              max={31}
-              className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
+                Fechamento <span className="text-[#5C5C72]">(opcional)</span>
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={cardForm.closing_day}
+                onChange={e => setCardForm(f => ({ ...f, closing_day: e.target.value }))}
+                placeholder="Ex: 3"
+                min={1}
+                max={31}
+                className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Vencimento *</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={cardForm.due_day}
+                onChange={e => setCardForm(f => ({ ...f, due_day: e.target.value }))}
+                placeholder="Ex: 10"
+                min={1}
+                max={31}
+                className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
           </div>
 
           <div>

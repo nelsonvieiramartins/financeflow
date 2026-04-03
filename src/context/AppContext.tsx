@@ -227,15 +227,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ---- Credit Cards CRUD ----
   async function addCreditCard(data: Omit<CreditCard, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    const { error } = await supabase.from('credit_cards').insert({ ...data, user_id: user.id })
+    const { data: newCard, error } = await supabase
+      .from('credit_cards')
+      .insert({ ...data, user_id: user.id })
+      .select()
+      .single()
     if (error) throw new Error(error.message)
-    await fetchData()
+    if (newCard) setCreditCards(prev => [...prev, newCard])
   }
 
   async function updateCreditCard(id: string, data: Partial<CreditCard>) {
-    const { error } = await supabase.from('credit_cards').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+    const updated_at = new Date().toISOString()
+    const { error } = await supabase.from('credit_cards').update({ ...data, updated_at }).eq('id', id)
     if (error) throw new Error(error.message)
-    await fetchData()
+    setCreditCards(prev => prev.map(c => c.id === id ? { ...c, ...data, updated_at } : c))
   }
 
   async function deleteCreditCard(id: string) {
