@@ -3,12 +3,13 @@ import { TrendingUp, TrendingDown } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
 
 interface Props {
-  totalExpenses: number
+  totalPaid: number
+  totalForecast: number
   totalIncome: number
 }
 
-export default function BalanceCard({ totalExpenses, totalIncome }: Props) {
-  const balance = totalIncome - totalExpenses
+export default function BalanceCard({ totalPaid, totalForecast, totalIncome }: Props) {
+  const balance = totalIncome - totalPaid
   const isPositive = balance >= 0
 
   return (
@@ -54,28 +55,39 @@ export default function BalanceCard({ totalExpenses, totalIncome }: Props) {
             <TrendingDown className="w-3.5 h-3.5 text-[#F87171]" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] text-[#9090A8]">Gastos</p>
-            <p className="text-sm font-semibold text-[#F87171] truncate">{formatCurrency(totalExpenses)}</p>
+            <p className="text-[10px] text-[#9090A8]">Pago</p>
+            <p className="text-sm font-semibold text-[#F87171] truncate">{formatCurrency(totalPaid)}</p>
           </div>
         </div>
       </div>
 
+      {/* Previsão de Gastos */}
+      {totalForecast > totalPaid && (
+        <div className="mt-3 flex items-center justify-between bg-white/[0.04] rounded-xl px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#FF9A3C]" />
+            <p className="text-[10px] text-[#9090A8]">Previsão de gastos</p>
+          </div>
+          <p className="text-xs font-semibold text-[#FF9A3C]">{formatCurrency(totalForecast)}</p>
+        </div>
+      )}
+
       {totalIncome > 0 && (
         <div className="mt-3">
           <div className="flex justify-between text-[10px] text-[#9090A8] mb-1">
-            <span>Comprometido</span>
-            <span>{Math.min(100, Math.round((totalExpenses / totalIncome) * 100))}%</span>
+            <span>Comprometido (previsão)</span>
+            <span>{Math.min(100, Math.round((totalForecast / totalIncome) * 100))}%</span>
           </div>
           <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
             <motion.div
               className="h-full rounded-full"
               style={{
-                background: totalExpenses / totalIncome > 0.8
+                background: totalForecast / totalIncome > 0.8
                   ? 'linear-gradient(90deg, #F87171, #EF4444)'
                   : 'linear-gradient(90deg, #6C63FF, #34D399)',
               }}
               initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, (totalExpenses / totalIncome) * 100)}%` }}
+              animate={{ width: `${Math.min(100, (totalForecast / totalIncome) * 100)}%` }}
               transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
             />
           </div>

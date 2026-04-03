@@ -14,7 +14,13 @@ export default function DashboardPage() {
   const { profile } = useAuth()
   const { expenses, income, receivables, investments, currentMonth, currentYear, setCurrentMonth, setCurrentYear, loading } = useApp()
 
-  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0)
+  // Previsão = total de todas as despesas do mês (pago + a pagar)
+  const totalForecast = expenses.reduce((s, e) => s + Number(e.amount), 0)
+  // Pago = fixos recorrentes só quando data_pagamento_real, variáveis sempre contam
+  const totalPaid = expenses.reduce((s, e) => {
+    if (e.is_recurring && !e.data_pagamento_real) return s
+    return s + Number(e.data_pagamento_real ? (e.valor_pago ?? e.amount) : e.amount)
+  }, 0)
   const totalIncome = income.reduce((s, i) => s + Number(i.amount), 0)
   const totalInvested = investments.reduce((s, i) => s + Number(i.amount), 0)
 
@@ -50,7 +56,7 @@ export default function DashboardPage() {
 
         <div className="mt-3 space-y-3">
           {/* Balance Hero Card */}
-          <BalanceCard totalExpenses={totalExpenses} totalIncome={totalIncome} />
+          <BalanceCard totalPaid={totalPaid} totalForecast={totalForecast} totalIncome={totalIncome} />
 
           {/* Quick Stats */}
           <QuickStats expenses={expenses} receivables={receivables} />
