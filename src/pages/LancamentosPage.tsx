@@ -26,11 +26,15 @@ type SectionKey = 'pix_fixo' | 'cartao_fixo' | 'pix_var' | 'cartao_var' | 'recei
 export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) {
   const {
     expenses, income, receivables, investments,
-    deleteExpense, deleteIncome, deleteReceivable, deleteInvestment,
+    deleteExpense, deleteIncome, deleteReceivable, deleteInvestment, deleteRecurringGroup,
     updateExpense, currentMonth, currentYear, setCurrentMonth, setCurrentYear,
   } = useApp()
   const [collapsed, setCollapsed] = useState<Partial<Record<SectionKey, boolean>>>({})
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; fn: (id: string) => void } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string
+    fn: (id: string) => void
+    expense?: Expense
+  } | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -41,8 +45,8 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
-  function requestDelete(fn: (id: string) => void, id: string) {
-    setPendingDelete({ id, fn })
+  function requestDelete(fn: (id: string) => void, id: string, expense?: Expense) {
+    setPendingDelete({ id, fn, expense })
   }
 
   function confirmPendingDelete() {
@@ -50,6 +54,14 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
       pendingDelete.fn(pendingDelete.id)
       setPendingDelete(null)
     }
+  }
+
+  function confirmDeleteGroup() {
+    const groupId = pendingDelete?.expense?.recurring_group_id
+    if (groupId) {
+      deleteRecurringGroup(groupId, currentMonth, currentYear)
+    }
+    setPendingDelete(null)
   }
 
   function handleDragEnd(event: DragEndEvent, items: Expense[]) {
@@ -110,7 +122,7 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
                 >
                   <SortableContext items={items.map(e => e.id)} strategy={verticalListSortingStrategy}>
                     {items.map(e => (
-                      <ExpenseItem key={e.id} expense={e} onEdit={onEditExpense} onDelete={(id) => requestDelete(deleteExpense, id)} />
+                      <ExpenseItem key={e.id} expense={e} onEdit={onEditExpense} onDelete={(id) => requestDelete(deleteExpense, id, e)} />
                     ))}
                   </SortableContext>
                 </DndContext>
@@ -299,22 +311,53 @@ export default function LancamentosPage({ onAddExpense, onEditExpense }: Props) 
               exit={{ y: 80 }}
               transition={{ type: 'spring', stiffness: 400, damping: 35 }}
             >
-              <p className="text-sm font-semibold text-white text-center mb-1">Excluir item?</p>
-              <p className="text-xs text-[#9090A8] text-center mb-4">Esta ação não pode ser desfeita.</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setPendingDelete(null)}
-                  className="flex-1 py-3 text-sm font-medium text-[#9090A8] bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmPendingDelete}
-                  className="flex-1 py-3 text-sm font-medium text-white bg-[#F87171]/20 text-[#F87171] rounded-xl hover:bg-[#F87171]/30 transition-colors"
-                >
-                  Excluir
-                </button>
-              </div>
+              {pendingDelete.expense?.recurring_group_id ? (
+                <>
+                  <p className="text-sm font-semibold text-white text-center mb-1">Excluir gasto recorrente?</p>
+                  <p className="text-xs text-[#9090A8] text-center mb-4">
+                    <span className="text-white">{pendingDelete.expense.description}</span> — escolha o alcance da exclusão.
+                  </p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={confirmPendingDelete}
+                      className="w-full py-3 text-sm font-medium text-[#F87171] bg-[#F87171]/10 border border-[#F87171]/20 rounded-xl hover:bg-[#F87171]/20 transition-colors"
+                    >
+                      Só este mês
+                    </button>
+                    <button
+                      onClick={confirmDeleteGroup}
+                      className="w-full py-3 text-sm font-medium text-[#F87171] bg-[#F87171]/20 rounded-xl hover:bg-[#F87171]/30 transition-colors"
+                    >
+                      Este e todos os próximos meses
+                    </button>
+                    <button
+                      onClick={() => setPendingDelete(null)}
+                      className="w-full py-3 text-sm font-medium text-[#9090A8] bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-white text-center mb-1">Excluir item?</p>
+                  <p className="text-xs text-[#9090A8] text-center mb-4">Esta ação não pode ser desfeita.</p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setPendingDelete(null)}
+                      className="flex-1 py-3 text-sm font-medium text-[#9090A8] bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={confirmPendingDelete}
+                      className="flex-1 py-3 text-sm font-medium text-[#F87171] bg-[#F87171]/20 rounded-xl hover:bg-[#F87171]/30 transition-colors"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}

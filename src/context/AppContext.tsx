@@ -18,6 +18,7 @@ interface AppContextType {
   addExpense: (data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateExpense: (id: string, data: Partial<Expense>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
+  deleteRecurringGroup: (groupId: string, fromMonth: number, fromYear: number) => Promise<void>
   addIncome: (data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateIncome: (id: string, data: Partial<Income>) => Promise<void>
   deleteIncome: (id: string) => Promise<void>
@@ -150,6 +151,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExpenses(prev => prev.filter(e => e.id !== id))
   }
 
+  async function deleteRecurringGroup(groupId: string, fromMonth: number, fromYear: number) {
+    const { error } = await supabase.from('expenses')
+      .delete()
+      .eq('recurring_group_id', groupId)
+      .or(`year.gt.${fromYear},and(year.eq.${fromYear},month.gte.${fromMonth})`)
+    if (error) throw new Error(error.message)
+    setExpenses(prev => prev.filter(e =>
+      !(e.recurring_group_id === groupId &&
+        (e.year > fromYear || (e.year === fromYear && e.month >= fromMonth)))
+    ))
+  }
+
   // ---- Income CRUD ----
   async function addIncome(data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
@@ -204,7 +217,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentMonth, currentYear, setCurrentMonth, setCurrentYear,
       expenses, income, receivables, investments, loading,
       refresh: fetchData,
-      addExpense, updateExpense, deleteExpense,
+      addExpense, updateExpense, deleteExpense, deleteRecurringGroup,
       addIncome, updateIncome, deleteIncome,
       addReceivable, updateReceivable, deleteReceivable,
       addInvestment, deleteInvestment,
