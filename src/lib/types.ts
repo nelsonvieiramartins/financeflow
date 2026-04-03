@@ -23,6 +23,16 @@ export interface Profile {
   updated_at: string
 }
 
+export interface CreditCard {
+  id: string
+  user_id: string
+  name: string
+  due_day: number
+  last_four: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Expense {
   id: string
   user_id: string
@@ -41,6 +51,7 @@ export interface Expense {
   data_pagamento_real: string | null
   valor_pago: number | null
   valor_juros: number | null
+  credit_card_id: string | null
   created_at: string
   updated_at: string
 }

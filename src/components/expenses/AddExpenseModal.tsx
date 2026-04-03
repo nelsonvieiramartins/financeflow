@@ -31,7 +31,7 @@ const CATEGORIES: ExpenseCategory[] = [
 const INCOME_SOURCES: IncomeSource[] = ['salario', 'beneficio', 'freelance', 'investimento', 'outros']
 
 export default function AddExpenseModal({ open, onClose, editExpense, initialTab = 'expense' }: Props) {
-  const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear } = useApp()
+  const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear, creditCards } = useApp()
 
   const [tab, setTab] = useState<EntryType>('expense')
   const [amountStr, setAmountStr] = useState('')
@@ -41,6 +41,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
   const [paymentMethod, setPaymentMethod] = useState<'pix_boleto' | 'cartao_fixo'>('pix_boleto')
   const [isFixed, setIsFixed] = useState(false)
   const [dueDate, setDueDate] = useState('')
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [isRecurrent, setIsRecurrent] = useState(false)
   const [recurEndMonth, setRecurEndMonth] = useState<number>(0)
   const [recurEndYear, setRecurEndYear] = useState<number>(0)
@@ -61,6 +62,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       setIsFixed(editExpense.is_recurring)
       setDueDate(editExpense.due_date ?? '')
       setNotes(editExpense.notes ?? '')
+      setSelectedCardId(editExpense.credit_card_id ?? null)
       if (editExpense.recurring_end_date) {
         setIsRecurrent(true)
         const d = new Date(editExpense.recurring_end_date + 'T00:00:00')
@@ -89,6 +91,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     setRecurEndMonth(0)
     setRecurEndYear(0)
     setDueDay(0)
+    setSelectedCardId(null)
     setFromPerson('')
     setNotes('')
     setError('')
@@ -135,6 +138,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
             ? `${editExpense.year}-${String(editExpense.month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
             : dueDate || null,
           notes: notes || null,
+          credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
         })
       } else if (tab === 'expense') {
         await addExpense({
@@ -153,6 +157,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           data_pagamento_real: null,
           valor_pago: null,
           valor_juros: null,
+          credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
         })
       } else if (tab === 'income') {
         await addIncome({
@@ -336,6 +341,40 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
                 ))}
               </div>
             </div>
+
+            {/* Seletor de cartão (quando método = Cartão) */}
+            {paymentMethod === 'cartao_fixo' && creditCards.length > 0 && (
+              <div>
+                <label className="text-xs text-[#9090A8] font-medium mb-2 block">
+                  Qual cartão? <span className="text-[#5C5C72]">(opcional)</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedCardId(null)}
+                    className={`px-3 py-2 text-xs rounded-xl transition-all border ${
+                      selectedCardId === null
+                        ? 'bg-[#6C63FF]/20 text-[#6C63FF] border-[#6C63FF]/40'
+                        : 'bg-bg-overlay text-[#9090A8] border-transparent'
+                    }`}
+                  >
+                    Não especificado
+                  </button>
+                  {creditCards.map(card => (
+                    <button
+                      key={card.id}
+                      onClick={() => setSelectedCardId(card.id)}
+                      className={`px-3 py-2 text-xs rounded-xl transition-all border ${
+                        selectedCardId === card.id
+                          ? 'bg-[#6C63FF]/20 text-[#6C63FF] border-[#6C63FF]/40'
+                          : 'bg-bg-overlay text-[#9090A8] border-transparent'
+                      }`}
+                    >
+                      {card.name}{card.last_four ? ` ••${card.last_four}` : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Recorrente (apenas para fixos) */}
             {isFixed && (

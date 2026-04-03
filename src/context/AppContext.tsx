@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
-import type { Expense, Income, Receivable, Investment } from '../lib/types'
+import type { Expense, Income, Receivable, Investment, CreditCard } from '../lib/types'
 
 interface AppContextType {
   currentMonth: number
@@ -13,6 +13,7 @@ interface AppContextType {
   income: Income[]
   receivables: Receivable[]
   investments: Investment[]
+  creditCards: CreditCard[]
   loading: boolean
   refresh: () => void
   addExpense: (data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
@@ -27,6 +28,9 @@ interface AppContextType {
   deleteReceivable: (id: string) => Promise<void>
   addInvestment: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   deleteInvestment: (id: string) => Promise<void>
+  addCreditCard: (data: Omit<CreditCard, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  updateCreditCard: (id: string, data: Partial<CreditCard>) => Promise<void>
+  deleteCreditCard: (id: string) => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -40,6 +44,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [income, setIncome] = useState<Income[]>([])
   const [receivables, setReceivables] = useState<Receivable[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
+  const [creditCards, setCreditCards] = useState<CreditCard[]>([])
   const [loading, setLoading] = useState(false)
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -47,7 +52,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return
     setLoading(true)
     try {
-      const [expRes, incRes, recRes, invRes] = await Promise.all([
+      const [expRes, incRes, recRes, invRes, cardRes] = await Promise.all([
         supabase.from('expenses').select('*')
           .eq('user_id', user.id).eq('month', currentMonth).eq('year', currentYear)
           .order('sort_order').order('created_at'),
@@ -57,11 +62,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .eq('user_id', user.id).eq('month', currentMonth).eq('year', currentYear),
         supabase.from('investments').select('*')
           .eq('user_id', user.id).eq('month', currentMonth).eq('year', currentYear),
+        supabase.from('credit_cards').select('*')
+          .eq('user_id', user.id).order('created_at'),
       ])
       setExpenses(expRes.data ?? [])
       setIncome(incRes.data ?? [])
       setReceivables(recRes.data ?? [])
       setInvestments(invRes.data ?? [])
+      setCreditCards(cardRes.data ?? [])
     } finally {
       setLoading(false)
     }
@@ -216,15 +224,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInvestments(prev => prev.filter(i => i.id !== id))
   }
 
+  // ---- Credit Cards CRUD ----
+  async function addCreditCard(data: Omit<CreditCard, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+    if (!user) return
+    const { error } = await supabase.from('credit_cards').insert({ ...data, user_id: user.id })
+    if (error) throw new Error(error.message)
+    await fetchData()
+  }
+
+  async function updateCreditCard(id: string, data: Partial<CreditCard>) {
+    const { error } = await supabase.from('credit_cards').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw new Error(error.message)
+    await fetchData()
+  }
+
+  async function deleteCreditCard(id: string) {
+    const { error } = await supabase.from('credit_cards').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    setCreditCards(prev => prev.filter(c => c.id !== id))
+  }
+
   return (
     <AppContext.Provider value={{
       currentMonth, currentYear, setCurrentMonth, setCurrentYear,
-      expenses, income, receivables, investments, loading,
+      expenses, income, receivables, investments, creditCards, loading,
       refresh: fetchData,
       addExpense, updateExpense, deleteExpense, deleteRecurringGroup,
       addIncome, updateIncome, deleteIncome,
       addReceivable, updateReceivable, deleteReceivable,
       addInvestment, deleteInvestment,
+      addCreditCard, updateCreditCard, deleteCreditCard,
     }}>
       {children}
     </AppContext.Provider>
