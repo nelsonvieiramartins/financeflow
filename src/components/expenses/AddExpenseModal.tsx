@@ -30,6 +30,10 @@ const CATEGORIES: ExpenseCategory[] = [
 
 const INCOME_SOURCES: IncomeSource[] = ['salario', 'beneficio', 'freelance', 'investimento', 'outros']
 
+function todayStr() {
+  return new Date().toISOString().split('T')[0]
+}
+
 export default function AddExpenseModal({ open, onClose, editExpense, initialTab = 'expense' }: Props) {
   const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear, creditCards } = useApp()
 
@@ -60,7 +64,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       setCategory(editExpense.category)
       setPaymentMethod(editExpense.payment_type === 'cartao_fixo' ? 'cartao_fixo' : 'pix_boleto')
       setIsFixed(editExpense.is_recurring)
-      setDueDate(editExpense.due_date ?? '')
+      setDueDate(editExpense.due_date ?? todayStr())
       setNotes(editExpense.notes ?? '')
       setSelectedCardId(editExpense.credit_card_id ?? null)
       if (editExpense.recurring_end_date) {
@@ -86,7 +90,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     setCategory('outros')
     setPaymentMethod('pix_boleto')
     setIsFixed(false)
-    setDueDate('')
+    setDueDate(todayStr())
     setIsRecurrent(false)
     setRecurEndMonth(0)
     setRecurEndYear(0)
@@ -125,7 +129,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       // Aqui definimos o dia base para o mês atual
       const computedDueDate = isFixed && isRecurrent && dueDay > 0
         ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
-        : dueDate || null
+        : dueDate || todayStr()
 
       if (editExpense) {
         await updateExpense(editExpense.id, {
@@ -441,10 +445,12 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
               </div>
             )}
 
-            {/* Vencimento do boleto (opcional) */}
+            {/* Data do gasto (variável) */}
             {!isFixed && (
               <div>
-                <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Vencimento (opcional)</label>
+                <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
+                  Data do gasto <span className="text-[#5C5C72]">(padrão: hoje)</span>
+                </label>
                 <input
                   type="date"
                   value={dueDate}
