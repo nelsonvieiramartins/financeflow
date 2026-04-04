@@ -105,14 +105,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return
 
     if (data.is_recurring && data.recurring_group_id) {
+      // Bulk insert: fire-and-forget para não bloquear o modal.
+      // Realtime (debouncedFetch) sincroniza o estado após os inserts.
       const rows = buildRecurringRows(data, user.id)
-      const { error } = await supabase.from('expenses').insert(rows)
-      if (error) throw new Error(error.message)
+      supabase.from('expenses').insert(rows).then(({ error }) => {
+        if (error) console.error('Recurring insert error:', error.message)
+      })
     } else {
       const { error } = await supabase.from('expenses').insert({ ...data, user_id: user.id })
       if (error) throw new Error(error.message)
     }
-    // Realtime dispara debouncedFetch automaticamente após o insert
   }
 
   function buildRecurringRows(
@@ -123,8 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let m = data.month
     let y = data.year
     const endDate = data.recurring_end_date ? new Date(data.recurring_end_date + 'T00:00:00') : null
-    const limit = endDate ? 120 : 60
-    // Extrai o dia de vencimento do due_date base (ex: "2025-04-15" → 15)
+    const limit = endDate ? 120 : 24
     const dueDateDay = data.due_date ? parseInt(data.due_date.split('-')[2]) : null
 
     for (let i = 0; i < limit; i++) {
@@ -145,6 +146,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         sort_order: data.sort_order,
         recurring_group_id: data.recurring_group_id,
         recurring_end_date: data.recurring_end_date,
+        credit_card_id: data.credit_card_id ?? null,
       })
       m++
       if (m > 12) { m = 1; y++ }
