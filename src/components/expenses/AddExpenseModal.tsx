@@ -4,8 +4,9 @@ import BottomSheet from '../ui/BottomSheet'
 import { useApp } from '../../context/AppContext'
 import type { Expense, ExpenseCategory, PaymentType, IncomeSource } from '../../lib/types'
 import {
-  CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS, INCOME_SOURCE_LABELS,
+  CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS, INCOME_SOURCE_LABELS, MONTHS,
 } from '../../lib/types'
+import { getCardClosingDay } from '../../lib/utils'
 
 export type EntryType = 'expense' | 'income' | 'receivable' | 'investment'
 
@@ -33,6 +34,19 @@ const INCOME_SOURCES: IncomeSource[] = ['salario', 'beneficio', 'freelance', 'in
 
 function todayStr() {
   return new Date().toISOString().split('T')[0]
+}
+
+/** Dado uma data de compra e o dia de fechamento do cartão,
+ *  retorna o mês/ano em que a compra cai na fatura. */
+function calcCardBillingMonth(purchaseDateStr: string, closingDay: number): { month: number; year: number } {
+  const [y, m, d] = purchaseDateStr.split('-').map(Number)
+  if (d > closingDay) {
+    // Passou do fechamento → vai para a fatura do próximo mês
+    const nextM = m === 12 ? 1 : m + 1
+    const nextY = m === 12 ? y + 1 : y
+    return { month: nextM, year: nextY }
+  }
+  return { month: m, year: y }
 }
 
 export default function AddExpenseModal({ open, onClose, editExpense, initialTab = 'expense', initialCardId = null }: Props) {
@@ -140,10 +154,24 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
         // else: null = permanente
       }
 
-      // due_date: cartão não precisa (o vencimento é do cartão), boleto usa dueDay
+      // due_date: cartão fixo não precisa; boleto usa dueDay; variável usa purchaseDate
       const computedDueDate = isFixed && isRecurrent && paymentMethod !== 'cartao_fixo' && dueDay > 0
         ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
         : (!isFixed ? dueDate || todayStr() : null)
+
+      // Mês/ano de alocação para despesas variáveis no cartão
+      let targetMonth = currentMonth
+      let targetYear = currentYear
+      if (!isFixed && selectedCardId) {
+        const card = creditCards.find(c => c.id === selectedCardId)
+        if (card) {
+          const closingDay = getCardClosingDay(card.due_day, card.closing_day)
+          const purchaseDate = dueDate || todayStr()
+          const billing = calcCardBillingMonth(purchaseDate, closingDay)
+          targetMonth = billing.month
+          targetYear = billing.year
+        }
+      }
 
       if (editExpense) {
         await updateExpense(editExpense.id, {
@@ -166,8 +194,8 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           payment_type: paymentMethod as PaymentType,
           is_recurring: isFixed,
           due_date: computedDueDate,
-          month: currentMonth,
-          year: currentYear,
+          month: targetMonth,
+          year: targetYear,
           notes: notes || null,
           sort_order: 0,
           recurring_group_id: (isFixed && isRecurrent) ? crypto.randomUUID() : null,
@@ -175,7 +203,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           data_pagamento_real: null,
           valor_pago: null,
           valor_juros: null,
-          credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
+          credit_card_id: (paymentMethod === 'cartao_fixo' || (!isFixed && selectedCardId)) ? selectedCardId : null,
         })
       } else if (tab === 'income') {
         await addIncome({
@@ -523,20 +551,38 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
               </div>
             )}
 
-            {/* Data do gasto (variável) */}
-            {!isFixed && (
-              <div>
-                <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
-                  Data do gasto <span className="text-[#5C5C72]">(padrão: hoje)</span>
-                </label>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
-                  className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
-            )}
+            {/* Data da compra / Data do gasto (variável) */}
+            {!isFixed && (() => {
+              const card = selectedCardId ? creditCards.find(c => c.id === selectedCardId) : null
+              const isCard = !!card
+              const purchaseDate = dueDate || todayStr()
+              const billing = isCard
+                ? calcCardBillingMonth(purchaseDate, getCardClosingDay(card!.due_day, card!.closing_day))
+                : null
+              const shifted = billing && (billing.month !== (new Date(purchaseDate + 'T00:00:00').getMonth() + 1))
+
+              return (
+                <div>
+                  <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
+                    {isCard ? 'Data da compra' : 'Data do gasto'}
+                    <span className="text-[#5C5C72]"> (padrão: hoje)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
+                  />
+                  {billing && (
+                    <p className={`text-[10px] mt-1.5 ${shifted ? 'text-[#FF9A3C]' : 'text-[#5C5C72]'}`}>
+                      {shifted
+                        ? `⚠ Compra após fechamento → lançado em ${MONTHS[billing.month - 1]} ${billing.year}`
+                        : `✓ Lançado em ${MONTHS[billing.month - 1]} ${billing.year}`}
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
           </>
         )}
 
