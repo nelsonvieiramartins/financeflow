@@ -8,7 +8,7 @@ import {
 } from '../../lib/types'
 import { getCardClosingDay } from '../../lib/utils'
 
-export type EntryType = 'expense' | 'income' | 'receivable' | 'investment'
+export type EntryType = 'expense' | 'income' | 'receivable' | 'investment' | 'fatura'
 
 interface Props {
   open: boolean
@@ -20,6 +20,7 @@ interface Props {
 
 const ENTRY_TABS: { id: EntryType; label: string; emoji: string }[] = [
   { id: 'expense',    label: 'Gasto',        emoji: '💸' },
+  { id: 'fatura',     label: 'Fatura',       emoji: '💳' },
   { id: 'income',     label: 'Receita',       emoji: '💰' },
   { id: 'receivable', label: 'A Receber',     emoji: '🤝' },
   { id: 'investment', label: 'Investimento',  emoji: '📈' },
@@ -50,7 +51,7 @@ function calcCardBillingMonth(purchaseDateStr: string, closingDay: number): { mo
 }
 
 export default function AddExpenseModal({ open, onClose, editExpense, initialTab = 'expense', initialCardId = null }: Props) {
-  const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear, creditCards } = useApp()
+  const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear, creditCards, expenses } = useApp()
 
   const [tab, setTab] = useState<EntryType>('expense')
   const [amountStr, setAmountStr] = useState('')
@@ -69,8 +70,17 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
   const [incomeSource, setIncomeSource] = useState<IncomeSource>('salario')
   const [fromPerson, setFromPerson] = useState('')
   const [notes, setNotes] = useState('')
+  const [faturaVencimentoDay, setFaturaVencimentoDay] = useState<number>(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Auto-preenche dia de vencimento ao selecionar cartão na aba Fatura
+  useEffect(() => {
+    if (tab === 'fatura' && selectedCardId) {
+      const card = creditCards.find(c => c.id === selectedCardId)
+      if (card) setFaturaVencimentoDay(card.due_day)
+    }
+  }, [selectedCardId, tab, creditCards])
 
   useEffect(() => {
     if (editExpense) {
@@ -114,6 +124,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     setDueDay(0)
     setSelectedCardId(null)
     setInstallmentsStr('')
+    setFaturaVencimentoDay(0)
     setFromPerson('')
     setNotes('')
     setError('')
@@ -133,7 +144,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
 
   async function handleSubmit() {
     setError('')
-    if (!description.trim()) { setError('Informe a descrição.'); return }
+    if (tab !== 'fatura' && !description.trim()) { setError('Informe a descrição.'); return }
     const amount = getAmount()
     if (amount <= 0) { setError('Informe um valor válido.'); return }
 
@@ -233,6 +244,30 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           year: currentYear,
           notes: notes || null,
         })
+      } else if (tab === 'fatura') {
+        if (!selectedCardId) { setError('Selecione um cartão.'); setLoading(false); return }
+        const card = creditCards.find(c => c.id === selectedCardId)
+        const faturaDate = faturaVencimentoDay > 0
+          ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(faturaVencimentoDay).padStart(2, '0')}`
+          : null
+        await addExpense({
+          description: `Fatura ${card?.name ?? 'Cartão'}`,
+          amount,
+          category: 'outros',
+          payment_type: paymentMethod as PaymentType,
+          is_recurring: false,
+          due_date: faturaDate,
+          month: currentMonth,
+          year: currentYear,
+          notes: notes || null,
+          sort_order: 0,
+          recurring_group_id: null,
+          recurring_end_date: null,
+          data_pagamento_real: null,
+          valor_pago: null,
+          valor_juros: null,
+          credit_card_id: null,
+        })
       }
       handleClose()
     } catch (err) {
@@ -243,7 +278,17 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     }
   }
 
+  const cardExpenses = tab === 'fatura' && selectedCardId
+    ? expenses.filter(e => e.credit_card_id === selectedCardId)
+    : []
+
+  const cardExpensesTotal = cardExpenses.reduce((s, e) => s + e.amount, 0)
+
   const sectionLabel = (() => {
+    if (tab === 'fatura') {
+      const card = selectedCardId ? creditCards.find(c => c.id === selectedCardId) : null
+      return card ? `Fatura · ${card.name}` : 'Fatura'
+    }
     if (tab !== 'expense') return null
     const tipo = isFixed ? 'Fixo' : 'Variável'
     const metodo = paymentMethod === 'pix_boleto' ? 'Pix/Boleto' : 'Cartão'
@@ -290,21 +335,137 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           </div>
         </div>
 
-        {/* Descrição */}
-        <div>
-          <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Descrição</label>
-          <input
-            type="text"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder={
-              tab === 'income' ? 'Ex: Salário março' :
-              tab === 'receivable' ? 'Ex: Aluguel do carro' :
-              'Ex: Supermercado'
-            }
-            className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
-          />
-        </div>
+        {/* Descrição — oculta na aba Fatura */}
+        {tab !== 'fatura' && (
+          <div>
+            <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Descrição</label>
+            <input
+              type="text"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder={
+                tab === 'income' ? 'Ex: Salário março' :
+                tab === 'receivable' ? 'Ex: Aluguel do carro' :
+                'Ex: Supermercado'
+              }
+              className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
+            />
+          </div>
+        )}
+
+        {/* ── FATURA ───────────────────────────────────────────── */}
+        {tab === 'fatura' && !editExpense && (
+          <>
+            {/* Seletor de cartão (obrigatório) */}
+            <div>
+              <label className="text-xs text-[#9090A8] font-medium mb-2 block">Cartão</label>
+              {creditCards.length === 0 ? (
+                <p className="text-xs text-[#5C5C72] bg-bg-overlay rounded-xl px-4 py-3">
+                  Nenhum cartão cadastrado. Adicione em Perfil.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {creditCards.map(card => (
+                    <button
+                      key={card.id}
+                      onClick={() => setSelectedCardId(card.id)}
+                      className={`px-3 py-2 text-xs rounded-xl transition-all border ${
+                        selectedCardId === card.id
+                          ? 'bg-[#6C63FF]/20 text-[#6C63FF] border-[#6C63FF]/40'
+                          : 'bg-bg-overlay text-[#9090A8] border-transparent'
+                      }`}
+                    >
+                      {card.name}{card.last_four ? ` ••${card.last_four}` : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Lançamentos vinculados ao cartão no mês atual */}
+            {selectedCardId && (
+              <div>
+                <label className="text-xs text-[#9090A8] font-medium mb-2 block">
+                  Lançamentos — {MONTHS[currentMonth - 1]} {currentYear}
+                </label>
+                {cardExpenses.length === 0 ? (
+                  <p className="text-xs text-[#5C5C72] text-center py-4 bg-bg-overlay rounded-xl">
+                    Nenhum lançamento encontrado para este cartão
+                  </p>
+                ) : (
+                  <div className="bg-bg-overlay rounded-2xl overflow-hidden">
+                    <div className="max-h-44 overflow-y-auto divide-y divide-white/5">
+                      {cardExpenses.map(exp => (
+                        <div key={exp.id} className="flex items-center justify-between px-3 py-2.5">
+                          <span className="text-xs text-white truncate flex-1 mr-2">{exp.description}</span>
+                          <span className="text-xs text-[#FF6B6B] font-medium whitespace-nowrap">
+                            R$ {exp.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2.5 border-t border-white/10 bg-white/3">
+                      <span className="text-xs font-semibold text-[#9090A8]">Total</span>
+                      <span className="text-xs font-bold text-white">
+                        R$ {cardExpensesTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Método de pagamento */}
+            <div>
+              <label className="text-xs text-[#9090A8] font-medium mb-2 block">Método de pagamento</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'pix_boleto' as const, label: 'Pix / Boleto', emoji: '📲', color: '#FF6B6B' },
+                  { value: 'cartao_fixo' as const, label: 'Outro cartão', emoji: '💳', color: '#6C63FF' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setPaymentMethod(opt.value)}
+                    className="flex flex-col items-center py-3 rounded-xl border transition-all"
+                    style={{
+                      background: paymentMethod === opt.value ? `${opt.color}15` : 'rgba(46,46,66,0.5)',
+                      borderColor: paymentMethod === opt.value ? opt.color : 'transparent',
+                    }}
+                  >
+                    <span className="text-xl mb-0.5">{opt.emoji}</span>
+                    <span className="text-xs font-medium" style={{ color: paymentMethod === opt.value ? opt.color : '#9090A8' }}>
+                      {opt.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Data de vencimento (apenas dia) */}
+            <div>
+              <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
+                Dia do vencimento
+              </label>
+              <input
+                type="number"
+                value={faturaVencimentoDay || ''}
+                onChange={e => {
+                  const v = Math.min(31, Math.max(1, Number(e.target.value)))
+                  setFaturaVencimentoDay(v)
+                }}
+                placeholder="Ex: 10"
+                min={1}
+                max={31}
+                className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
+              />
+              {faturaVencimentoDay > 0 && (
+                <p className="text-[10px] text-[#5C5C72] mt-1.5">
+                  Vence dia {faturaVencimentoDay} de {MONTHS[currentMonth - 1]} {currentYear}
+                </p>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Campos de despesa */}
         {(tab === 'expense' || editExpense) && (
