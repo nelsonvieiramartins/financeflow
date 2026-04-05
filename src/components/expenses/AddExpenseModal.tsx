@@ -352,24 +352,26 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           </div>
         )}
 
-        {/* Valor */}
-        <div className="bg-bg-overlay rounded-2xl p-4 text-center" style={{ display: (tab || editExpense) ? undefined : 'none' }}>
-          {sectionLabel && (
-            <p className="text-[10px] text-primary font-medium uppercase tracking-wider mb-1">{sectionLabel}</p>
-          )}
-          <p className="text-xs text-[#9090A8] mb-1">Valor</p>
-          <div className="flex items-center justify-center gap-1">
-            <span className="text-2xl text-[#9090A8] font-light">R$</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={amountStr}
-              onChange={e => setAmountStr(formatAmount(e.target.value))}
-              placeholder="0,00"
-              className="text-4xl font-bold text-white bg-transparent border-none outline-none text-center w-48 placeholder-[#5C5C72]"
-            />
+        {/* Valor — só aparece após selecionar tipo */}
+        {(tab || editExpense) && (
+          <div className="bg-bg-overlay rounded-2xl p-4 text-center">
+            {sectionLabel && (
+              <p className="text-[10px] text-primary font-medium uppercase tracking-wider mb-1">{sectionLabel}</p>
+            )}
+            <p className="text-xs text-[#9090A8] mb-1">Valor</p>
+            <div className="flex items-center justify-center gap-1">
+              <span className="text-2xl text-[#9090A8] font-light">R$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={amountStr}
+                onChange={e => setAmountStr(formatAmount(e.target.value))}
+                placeholder="0,00"
+                className="text-4xl font-bold text-white bg-transparent border-none outline-none text-center w-48 placeholder-[#5C5C72]"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Campos + botão — só visíveis após escolher o tipo */}
         {/* Descrição — oculta na aba Fatura */}
