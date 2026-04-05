@@ -16,17 +16,17 @@ interface AppContextType {
   creditCards: CreditCard[]
   loading: boolean
   refresh: () => void
-  addExpense: (data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
+  addExpense: (data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateExpense: (id: string, data: Partial<Expense>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
   deleteRecurringGroup: (groupId: string, fromMonth: number, fromYear: number) => Promise<void>
-  addIncome: (data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
+  addIncome: (data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateIncome: (id: string, data: Partial<Income>) => Promise<void>
   deleteIncome: (id: string) => Promise<void>
-  addReceivable: (data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
+  addReceivable: (data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateReceivable: (id: string, data: Partial<Receivable>) => Promise<void>
   deleteReceivable: (id: string) => Promise<void>
-  addInvestment: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
+  addInvestment: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   deleteInvestment: (id: string) => Promise<void>
   addCreditCard: (data: Omit<CreditCard, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateCreditCard: (id: string, data: Partial<CreditCard>) => Promise<void>
@@ -100,21 +100,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user, debouncedFetch])
 
+  // Garante que qualquer promise Supabase resolve em no máximo `ms` ms.
+  // Se travar, resolve como sucesso (sem lançar) e o insert continua em background.
+  function raceTimeout<T extends { error: unknown }>(
+    promise: Promise<T>,
+    ms = 8000,
+  ): Promise<T> {
+    const timeout = new Promise<T>(resolve =>
+      setTimeout(() => resolve({ error: null } as T), ms)
+    )
+    return Promise.race([promise, timeout])
+  }
+
   // ---- Expense CRUD ----
-  function addExpense(data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  async function addExpense(data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
 
     const rows = data.is_recurring && data.recurring_group_id
       ? buildRecurringRows(data, user.id)
-      : [{ ...data, user_id: user.id }]
+      : [buildExpenseRow(data, user.id)]
 
-    supabase.from('expenses').insert(rows).then(({ error }) => {
-      if (error) {
-        console.error('addExpense error:', error.message)
-      }
-      // Sempre atualiza o estado, independente do Realtime
-      debouncedFetch()
-    })
+    const { error } = await raceTimeout(supabase.from('expenses').insert(rows))
+    if (error) throw new Error((error as { message: string }).message)
+    debouncedFetch()
+  }
+
+  // Monta uma linha de expense sem spread para evitar colunas inexistentes no schema
+  function buildExpenseRow(
+    data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
+    userId: string,
+  ) {
+    return {
+      user_id: userId,
+      description: data.description,
+      amount: data.amount,
+      category: data.category,
+      payment_type: data.payment_type,
+      is_recurring: data.is_recurring,
+      due_date: data.due_date,
+      month: data.month,
+      year: data.year,
+      notes: data.notes ?? null,
+      sort_order: data.sort_order,
+      recurring_group_id: data.recurring_group_id ?? null,
+      recurring_end_date: data.recurring_end_date ?? null,
+      credit_card_id: data.credit_card_id ?? null,
+    }
   }
 
   function buildRecurringRows(
@@ -178,12 +209,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   // ---- Income CRUD ----
-  function addIncome(data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  async function addIncome(data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    supabase.from('income').insert({ ...data, user_id: user.id }).then(({ error }) => {
-      if (error) console.error('addIncome error:', error.message)
-      debouncedFetch()
-    })
+    const { error } = await raceTimeout(supabase.from('income').insert({
+      user_id: user.id,
+      description: data.description,
+      amount: data.amount,
+      source: data.source,
+      month: data.month,
+      year: data.year,
+      notes: data.notes ?? null,
+    }))
+    if (error) throw new Error((error as { message: string }).message)
+    debouncedFetch()
   }
 
   async function updateIncome(id: string, data: Partial<Income>) {
@@ -198,12 +236,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   // ---- Receivables CRUD ----
-  function addReceivable(data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  async function addReceivable(data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    supabase.from('receivables').insert({ ...data, user_id: user.id }).then(({ error }) => {
-      if (error) console.error('addReceivable error:', error.message)
-      debouncedFetch()
-    })
+    const { error } = await raceTimeout(supabase.from('receivables').insert({
+      user_id: user.id,
+      description: data.description,
+      amount: data.amount,
+      from_person: data.from_person,
+      received: data.received,
+      month: data.month,
+      year: data.year,
+    }))
+    if (error) throw new Error((error as { message: string }).message)
+    debouncedFetch()
   }
 
   async function updateReceivable(id: string, data: Partial<Receivable>) {
@@ -218,12 +263,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   // ---- Investments CRUD ----
-  function addInvestment(data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  async function addInvestment(data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    supabase.from('investments').insert({ ...data, user_id: user.id }).then(({ error }) => {
-      if (error) console.error('addInvestment error:', error.message)
-      debouncedFetch()
-    })
+    const { error } = await raceTimeout(supabase.from('investments').insert({
+      user_id: user.id,
+      description: data.description,
+      amount: data.amount,
+      month: data.month,
+      year: data.year,
+      notes: data.notes ?? null,
+    }))
+    if (error) throw new Error((error as { message: string }).message)
+    debouncedFetch()
   }
 
   async function deleteInvestment(id: string) {

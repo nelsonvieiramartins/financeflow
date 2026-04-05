@@ -200,7 +200,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
         })
       } else if (tab === 'expense') {
-        addExpense({
+        await addExpense({
           description: description.trim(),
           amount,
           category,
@@ -219,7 +219,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
         })
       } else if (tab === 'income') {
-        addIncome({
+        await addIncome({
           description: description.trim(),
           amount,
           source: incomeSource,
@@ -229,7 +229,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
         })
       } else if (tab === 'receivable') {
         if (!fromPerson.trim()) { setError('Informe quem irá pagar.'); setLoading(false); return }
-        addReceivable({
+        await addReceivable({
           description: description.trim(),
           amount,
           from_person: fromPerson.trim(),
@@ -238,7 +238,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           year: currentYear,
         })
       } else if (tab === 'investment') {
-        addInvestment({
+        await addInvestment({
           description: description.trim(),
           amount,
           month: currentMonth,
@@ -251,7 +251,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
         const faturaDate = faturaVencimentoDay > 0
           ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(faturaVencimentoDay).padStart(2, '0')}`
           : null
-        addExpense({
+        await addExpense({
           description: `Fatura ${card?.name ?? 'Cartão'}`,
           amount,
           category: 'outros',
