@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth()
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'confirm'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -37,7 +37,16 @@ export default function AuthPage() {
         setError(error.message)
       } else {
         setRegisteredEmail(email)
-        setMode('confirm')
+        setSuccess('ok')
+        // Redireciona para o login após 4 segundos
+        setTimeout(() => {
+          setSuccess('')
+          setRegisteredEmail('')
+          setMode('login')
+          setName('')
+          setPassword('')
+          setConfirmPassword('')
+        }, 4000)
       }
 
     } else if (mode === 'forgot') {
@@ -55,6 +64,7 @@ export default function AuthPage() {
     setMode(m)
     setError('')
     setSuccess('')
+    setRegisteredEmail('')
     setPassword('')
     setConfirmPassword('')
   }
@@ -77,70 +87,8 @@ export default function AuthPage() {
           <p className="text-sm text-[#9090A8] mt-1">Seus gastos, sob controle</p>
         </div>
 
-        {/* ── Tela de confirmação de email ── */}
-        <AnimatePresence>
-          {mode === 'confirm' && (
-            <motion.div
-              key="confirm"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
-              transition={{ duration: 0.3 }}
-              className="text-center"
-            >
-              <div className="flex justify-center mb-5">
-                <div className="w-20 h-20 bg-[#34D399]/15 border border-[#34D399]/30 rounded-3xl flex items-center justify-center">
-                  <MailCheck className="w-10 h-10 text-[#34D399]" strokeWidth={1.5} />
-                </div>
-              </div>
-
-              <h2 className="text-xl font-bold text-white mb-2">Confirme seu email</h2>
-              <p className="text-sm text-[#9090A8] leading-relaxed mb-1">
-                Enviamos um link de ativação para:
-              </p>
-              <p className="text-sm font-semibold text-primary mb-5 break-all">
-                {registeredEmail}
-              </p>
-
-              <div className="bg-bg-overlay border border-white/8 rounded-2xl p-4 mb-6 text-left space-y-2.5">
-                {[
-                  'Abra o email que acabamos de enviar',
-                  'Clique no link "Confirmar email"',
-                  'Após confirmar, volte aqui e faça login',
-                ].map((step, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    <p className="text-xs text-[#9090A8]">{step}</p>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={() => switchMode('login')}
-                className="w-full bg-gradient-primary text-white font-semibold py-3.5 rounded-xl shadow-glow-primary transition-all duration-200 active:scale-95"
-              >
-                Ir para o login
-              </button>
-
-              <p className="text-xs text-[#5C5C72] mt-4">
-                Não recebeu?{' '}
-                <button
-                  onClick={async () => {
-                    await supabase.auth.resend({ type: 'signup', email: registeredEmail })
-                  }}
-                  className="text-primary underline underline-offset-2"
-                >
-                  Reenviar email
-                </button>
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Mode tabs (only login / register) */}
-        {mode !== 'forgot' && mode !== 'confirm' && (
+        {mode !== 'forgot' && (
           <div className="flex bg-bg-surface rounded-xl p-1 mb-6 border border-white/5">
             {(['login', 'register'] as const).map(m => (
               <button
@@ -169,7 +117,7 @@ export default function AuthPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className={`space-y-4 ${mode === 'confirm' ? 'hidden' : ''}`}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name field (register only) */}
           <AnimatePresence>
             {mode === 'register' && (
@@ -268,7 +216,6 @@ export default function AuthPage() {
                         >
                           {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
-                        {/* Match indicator */}
                         {confirmPassword.length > 0 && (
                           <p className={`text-[11px] mt-1 ml-1 ${confirmPassword === password ? 'text-[#34D399]' : 'text-[#F87171]'}`}>
                             {confirmPassword === password ? '✓ Senhas coincidem' : '✗ Senhas não coincidem'}
@@ -295,12 +242,47 @@ export default function AuthPage() {
             )}
           </AnimatePresence>
 
+          {/* Erro */}
           {error && (
             <p className="text-sm text-[#F87171] bg-[#F87171]/10 border border-[#F87171]/20 rounded-xl px-4 py-3">
               {error}
             </p>
           )}
-          {success && (
+
+          {/* Aviso pós-cadastro: confirmação de email */}
+          <AnimatePresence>
+            {success === 'ok' && registeredEmail && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.25 }}
+                className="bg-[#34D399]/10 border border-[#34D399]/30 rounded-2xl p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-[#34D399]/20 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <MailCheck className="w-4 h-4 text-[#34D399]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#34D399] mb-1">
+                      Cadastro realizado!
+                    </p>
+                    <p className="text-xs text-[#9090A8] leading-relaxed">
+                      Enviamos um link de confirmação para{' '}
+                      <span className="text-white font-medium break-all">{registeredEmail}</span>.
+                      {' '}Acesse seu email e clique no link para ativar sua conta antes de fazer login.
+                    </p>
+                    <p className="text-[11px] text-[#5C5C72] mt-2">
+                      Redirecionando para o login...
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Sucesso genérico (forgot password) */}
+          {success && success !== 'ok' && (
             <p className="text-sm text-[#34D399] bg-[#34D399]/10 border border-[#34D399]/20 rounded-xl px-4 py-3">
               {success}
             </p>
@@ -308,7 +290,7 @@ export default function AuthPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || success === 'ok'}
             className="w-full bg-gradient-primary text-white font-semibold py-3.5 rounded-xl shadow-glow-primary transition-all duration-200 active:scale-95 disabled:opacity-60"
           >
             {loading
