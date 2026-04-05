@@ -326,40 +326,29 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     <BottomSheet open={open} onClose={handleClose} title={editExpense ? 'Editar Lançamento' : 'Novo Lançamento'}>
       <div className="space-y-4">
 
-        {/* Seleção de tipo — cards grandes quando nenhum tipo escolhido */}
-        {!editExpense && !tab && (
+        {/* Tabs de tipo — sempre visíveis, nenhum selecionado por padrão */}
+        {!editExpense && (
           <div>
-            <p className="text-xs text-[#9090A8] font-medium mb-3 text-center">Qual tipo de lançamento?</p>
-            <div className="grid grid-cols-2 gap-2">
+            {!tab && (
+              <p className="text-xs text-[#FF9A3C] font-medium mb-2 text-center">
+                Selecione o tipo de lançamento para continuar
+              </p>
+            )}
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
               {ENTRY_TABS.map(t => (
-                <motion.button
+                <button
                   key={t.id}
                   onClick={() => { setTab(t.id); setError('') }}
-                  whileTap={{ scale: 0.96 }}
-                  className="flex flex-col items-center gap-2 py-5 rounded-2xl bg-bg-overlay border border-white/8 transition-all hover:border-primary/40"
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all border ${
+                    tab === t.id
+                      ? 'bg-gradient-primary text-white shadow-glow-sm border-transparent'
+                      : 'bg-bg-overlay text-[#9090A8] border-white/10'
+                  }`}
                 >
-                  <span className="text-3xl leading-none">{t.emoji}</span>
-                  <span className="text-sm font-semibold text-white">{t.label}</span>
-                </motion.button>
+                  <span>{t.emoji}</span> {t.label}
+                </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Tabs compactos — apenas após tipo escolhido */}
-        {!editExpense && tab && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-            {ENTRY_TABS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => { setTab(t.id); setError('') }}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
-                  tab === t.id ? 'bg-gradient-primary text-white shadow-glow-sm' : 'bg-bg-overlay text-[#9090A8]'
-                }`}
-              >
-                <span>{t.emoji}</span> {t.label}
-              </button>
-            ))}
           </div>
         )}
 
@@ -839,8 +828,8 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
 
             <button
               onClick={handleSubmit}
-              disabled={loading}
-              className="w-full bg-gradient-primary text-white font-semibold py-4 rounded-xl shadow-glow-primary transition-all active:scale-95 disabled:opacity-60"
+              disabled={loading || (!tab && !editExpense)}
+              className="w-full bg-gradient-primary text-white font-semibold py-4 rounded-xl shadow-glow-primary transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading ? 'Salvando...' : editExpense ? 'Salvar alterações' : 'Adicionar lançamento'}
             </button>
