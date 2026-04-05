@@ -162,7 +162,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       // Mês/ano de alocação: cartão (fixo não-recorrente ou variável) usa data da compra
       let targetMonth = currentMonth
       let targetYear = currentYear
-      const useCardBilling = paymentMethod === 'cartao_fixo' && selectedCardId && !(isFixed && isRecurrent)
+      const useCardBilling = paymentMethod === 'cartao_fixo' && selectedCardId
       if (useCardBilling) {
         const card = creditCards.find(c => c.id === selectedCardId)
         if (card) {
@@ -423,8 +423,8 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
               </div>
             )}
 
-            {/* Data da compra — cartão fixo ou variável (exceto fixo recorrente que gerencia mês sozinho) */}
-            {paymentMethod === 'cartao_fixo' && !(isFixed && isRecurrent) && (() => {
+            {/* Data da compra — sempre que método = Cartão */}
+            {paymentMethod === 'cartao_fixo' && (() => {
               const card = selectedCardId ? creditCards.find(c => c.id === selectedCardId) : null
               const purchaseDate = dueDate || todayStr()
               const billing = card
