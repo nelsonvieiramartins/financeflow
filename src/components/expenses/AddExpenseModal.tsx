@@ -159,10 +159,11 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
         ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
         : (!isFixed ? dueDate || todayStr() : null)
 
-      // Mês/ano de alocação para despesas variáveis no cartão
+      // Mês/ano de alocação: cartão (fixo não-recorrente ou variável) usa data da compra
       let targetMonth = currentMonth
       let targetYear = currentYear
-      if (!isFixed && selectedCardId) {
+      const useCardBilling = paymentMethod === 'cartao_fixo' && selectedCardId && !(isFixed && isRecurrent)
+      if (useCardBilling) {
         const card = creditCards.find(c => c.id === selectedCardId)
         if (card) {
           const closingDay = getCardClosingDay(card.due_day, card.closing_day)
@@ -203,7 +204,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           data_pagamento_real: null,
           valor_pago: null,
           valor_juros: null,
-          credit_card_id: (paymentMethod === 'cartao_fixo' || (!isFixed && selectedCardId)) ? selectedCardId : null,
+          credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
         })
       } else if (tab === 'income') {
         await addIncome({
@@ -388,7 +389,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
               </div>
             </div>
 
-            {/* Seletor de cartão (quando método = Cartão) */}
+            {/* Seletor de cartão — único, aparece só quando método = Cartão */}
             {paymentMethod === 'cartao_fixo' && creditCards.length > 0 && (
               <div>
                 <label className="text-xs text-[#9090A8] font-medium mb-2 block">
@@ -421,6 +422,36 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
                 </div>
               </div>
             )}
+
+            {/* Data da compra — cartão fixo ou variável (exceto fixo recorrente que gerencia mês sozinho) */}
+            {paymentMethod === 'cartao_fixo' && !(isFixed && isRecurrent) && (() => {
+              const card = selectedCardId ? creditCards.find(c => c.id === selectedCardId) : null
+              const purchaseDate = dueDate || todayStr()
+              const billing = card
+                ? calcCardBillingMonth(purchaseDate, getCardClosingDay(card.due_day, card.closing_day))
+                : null
+              const shifted = billing && (billing.month !== new Date(purchaseDate + 'T00:00:00').getMonth() + 1)
+              return (
+                <div>
+                  <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
+                    Data da compra <span className="text-[#5C5C72]">(padrão: hoje)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
+                  />
+                  {billing && (
+                    <p className={`text-[10px] mt-1.5 ${shifted ? 'text-[#FF9A3C]' : 'text-[#5C5C72]'}`}>
+                      {shifted
+                        ? `⚠ Após fechamento → lançado em ${MONTHS[billing.month - 1]} ${billing.year}`
+                        : `✓ Lançado em ${MONTHS[billing.month - 1]} ${billing.year}`}
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Recorrente (apenas para fixos) */}
             {isFixed && (
@@ -517,72 +548,20 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
               </div>
             )}
 
-            {/* Cartão para gastos variáveis (fatura) */}
-            {!isFixed && creditCards.length > 0 && (
+            {/* Data do gasto — apenas para variável + pix/boleto */}
+            {!isFixed && paymentMethod !== 'cartao_fixo' && (
               <div>
-                <label className="text-xs text-[#9090A8] font-medium mb-2 block">
-                  Cartão <span className="text-[#5C5C72]">(opcional — use para lançar fatura)</span>
+                <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
+                  Data do gasto <span className="text-[#5C5C72]">(padrão: hoje)</span>
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSelectedCardId(null)}
-                    className={`px-3 py-2 text-xs rounded-xl transition-all border ${
-                      selectedCardId === null
-                        ? 'bg-[#6C63FF]/20 text-[#6C63FF] border-[#6C63FF]/40'
-                        : 'bg-bg-overlay text-[#9090A8] border-transparent'
-                    }`}
-                  >
-                    Nenhum
-                  </button>
-                  {creditCards.map(card => (
-                    <button
-                      key={card.id}
-                      onClick={() => setSelectedCardId(card.id)}
-                      className={`px-3 py-2 text-xs rounded-xl transition-all border ${
-                        selectedCardId === card.id
-                          ? 'bg-[#6C63FF]/20 text-[#6C63FF] border-[#6C63FF]/40'
-                          : 'bg-bg-overlay text-[#9090A8] border-transparent'
-                      }`}
-                    >
-                      {card.name}{card.last_four ? ` ••${card.last_four}` : ''}
-                    </button>
-                  ))}
-                </div>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={e => setDueDate(e.target.value)}
+                  className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
+                />
               </div>
             )}
-
-            {/* Data da compra / Data do gasto (variável) */}
-            {!isFixed && (() => {
-              const card = selectedCardId ? creditCards.find(c => c.id === selectedCardId) : null
-              const isCard = !!card
-              const purchaseDate = dueDate || todayStr()
-              const billing = isCard
-                ? calcCardBillingMonth(purchaseDate, getCardClosingDay(card!.due_day, card!.closing_day))
-                : null
-              const shifted = billing && (billing.month !== (new Date(purchaseDate + 'T00:00:00').getMonth() + 1))
-
-              return (
-                <div>
-                  <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">
-                    {isCard ? 'Data da compra' : 'Data do gasto'}
-                    <span className="text-[#5C5C72]"> (padrão: hoje)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={e => setDueDate(e.target.value)}
-                    className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
-                  />
-                  {billing && (
-                    <p className={`text-[10px] mt-1.5 ${shifted ? 'text-[#FF9A3C]' : 'text-[#5C5C72]'}`}>
-                      {shifted
-                        ? `⚠ Compra após fechamento → lançado em ${MONTHS[billing.month - 1]} ${billing.year}`
-                        : `✓ Lançado em ${MONTHS[billing.month - 1]} ${billing.year}`}
-                    </p>
-                  )}
-                </div>
-              )
-            })()}
           </>
         )}
 
