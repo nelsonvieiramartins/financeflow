@@ -14,6 +14,7 @@ interface Props {
   onClose: () => void
   editExpense?: Expense | null
   initialTab?: EntryType
+  initialCardId?: string | null
 }
 
 const ENTRY_TABS: { id: EntryType; label: string; emoji: string }[] = [
@@ -34,7 +35,7 @@ function todayStr() {
   return new Date().toISOString().split('T')[0]
 }
 
-export default function AddExpenseModal({ open, onClose, editExpense, initialTab = 'expense' }: Props) {
+export default function AddExpenseModal({ open, onClose, editExpense, initialTab = 'expense', initialCardId = null }: Props) {
   const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear, creditCards } = useApp()
 
   const [tab, setTab] = useState<EntryType>('expense')
@@ -46,6 +47,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
   const [isFixed, setIsFixed] = useState(false)
   const [dueDate, setDueDate] = useState('')
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const [installmentsStr, setInstallmentsStr] = useState('')
   const [isRecurrent, setIsRecurrent] = useState(false)
   const [recurEndMonth, setRecurEndMonth] = useState<number>(0)
   const [recurEndYear, setRecurEndYear] = useState<number>(0)
@@ -81,8 +83,9 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     } else {
       resetForm()
       setTab(initialTab)
+      if (initialCardId) setSelectedCardId(initialCardId)
     }
-  }, [editExpense, open, initialTab])
+  }, [editExpense, open, initialTab, initialCardId])
 
   function resetForm() {
     setAmountStr('')
@@ -96,6 +99,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     setRecurEndYear(0)
     setDueDay(0)
     setSelectedCardId(null)
+    setInstallmentsStr('')
     setFromPerson('')
     setNotes('')
     setError('')
@@ -121,15 +125,25 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
 
     setLoading(true)
     try {
-      const recurringEndDate = (isFixed && isRecurrent && recurEndMonth > 0 && recurEndYear > 0)
-        ? `${recurEndYear}-${String(recurEndMonth).padStart(2, '0')}-01`
-        : null
+      // Calcular data fim: cartão usa parcelas, boleto usa mês/ano
+      let recurringEndDate: string | null = null
+      if (isFixed && isRecurrent) {
+        if (paymentMethod === 'cartao_fixo' && installmentsStr && parseInt(installmentsStr) > 0) {
+          const n = parseInt(installmentsStr)
+          let endM = currentMonth + n - 1
+          let endY = currentYear
+          while (endM > 12) { endM -= 12; endY++ }
+          recurringEndDate = `${endY}-${String(endM).padStart(2, '0')}-01`
+        } else if (paymentMethod !== 'cartao_fixo' && recurEndMonth > 0 && recurEndYear > 0) {
+          recurringEndDate = `${recurEndYear}-${String(recurEndMonth).padStart(2, '0')}-01`
+        }
+        // else: null = permanente
+      }
 
-      // Para gastos fixos recorrentes, due_date é calculado por mês no buildRecurringRows
-      // Aqui definimos o dia base para o mês atual
-      const computedDueDate = isFixed && isRecurrent && dueDay > 0
+      // due_date: cartão não precisa (o vencimento é do cartão), boleto usa dueDay
+      const computedDueDate = isFixed && isRecurrent && paymentMethod !== 'cartao_fixo' && dueDay > 0
         ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
-        : dueDate || todayStr()
+        : (!isFixed ? dueDate || todayStr() : null)
 
       if (editExpense) {
         await updateExpense(editExpense.id, {
@@ -138,9 +152,9 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           category,
           payment_type: paymentMethod as PaymentType,
           is_recurring: isFixed,
-          due_date: isFixed && dueDay > 0
+          due_date: isFixed && paymentMethod !== 'cartao_fixo' && dueDay > 0
             ? `${editExpense.year}-${String(editExpense.month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`
-            : dueDate || null,
+            : (!isFixed ? dueDate || null : null),
           notes: notes || null,
           credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
         })
@@ -385,7 +399,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
               <div className="bg-bg-overlay rounded-2xl p-4 space-y-3">
                 <button
                   type="button"
-                  onClick={() => { setIsRecurrent(v => !v); setRecurEndMonth(0); setRecurEndYear(0) }}
+                  onClick={() => { setIsRecurrent(v => !v); setRecurEndMonth(0); setRecurEndYear(0); setInstallmentsStr('') }}
                   className="w-full flex items-center justify-between"
                 >
                   <div>
@@ -401,47 +415,111 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
 
                 {isRecurrent && (
                   <div className="space-y-3">
-                    <div>
-                      <p className="text-xs text-[#9090A8] font-medium mb-2">Dia do vencimento <span className="text-[#5C5C72]">(opcional)</span></p>
-                      <input
-                        type="number"
-                        value={dueDay || ''}
-                        onChange={e => {
-                          const v = Math.min(31, Math.max(0, Number(e.target.value)))
-                          setDueDay(v)
-                        }}
-                        placeholder="Ex: 15"
-                        min={1}
-                        max={31}
-                        className="w-full bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                    <p className="text-xs text-[#9090A8] font-medium mb-2">Até quando? <span className="text-[#5C5C72]">(opcional — sem data = 5 anos)</span></p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <select
-                        value={recurEndMonth}
-                        onChange={e => setRecurEndMonth(Number(e.target.value))}
-                        className="bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-primary"
-                      >
-                        <option value={0}>Mês</option>
-                        {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m, i) => (
-                          <option key={i} value={i + 1}>{m}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        value={recurEndYear || ''}
-                        onChange={e => setRecurEndYear(Number(e.target.value))}
-                        placeholder="Ano"
-                        min={currentYear}
-                        max={currentYear + 10}
-                        className="bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    </div>
+                    {/* Cartão: apenas parcelas. Pix/Boleto: dia de vencimento + até quando */}
+                    {paymentMethod === 'cartao_fixo' ? (
+                      <div>
+                        <p className="text-xs text-[#9090A8] font-medium mb-2">
+                          Parcelas <span className="text-[#5C5C72]">(vazio = permanente)</span>
+                        </p>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={installmentsStr}
+                          onChange={e => setInstallmentsStr(e.target.value.replace(/\D/g, ''))}
+                          placeholder="Ex: 12"
+                          min={1}
+                          className="w-full bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary"
+                        />
+                        {installmentsStr && parseInt(installmentsStr) > 0 && (
+                          <p className="text-[10px] text-[#5C5C72] mt-1">
+                            Até {(() => {
+                              let m = currentMonth + parseInt(installmentsStr) - 1
+                              let y = currentYear
+                              while (m > 12) { m -= 12; y++ }
+                              return `${String(m).padStart(2,'0')}/${y}`
+                            })()}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <p className="text-xs text-[#9090A8] font-medium mb-2">Dia do vencimento <span className="text-[#5C5C72]">(opcional)</span></p>
+                          <input
+                            type="number"
+                            value={dueDay || ''}
+                            onChange={e => {
+                              const v = Math.min(31, Math.max(0, Number(e.target.value)))
+                              setDueDay(v)
+                            }}
+                            placeholder="Ex: 15"
+                            min={1}
+                            max={31}
+                            className="w-full bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#9090A8] font-medium mb-2">Até quando? <span className="text-[#5C5C72]">(opcional — sem data = permanente)</span></p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <select
+                              value={recurEndMonth}
+                              onChange={e => setRecurEndMonth(Number(e.target.value))}
+                              className="bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-primary"
+                            >
+                              <option value={0}>Mês</option>
+                              {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m, i) => (
+                                <option key={i} value={i + 1}>{m}</option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              value={recurEndYear || ''}
+                              onChange={e => setRecurEndYear(Number(e.target.value))}
+                              placeholder="Ano"
+                              min={currentYear}
+                              max={currentYear + 10}
+                              className="bg-bg-elevated border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Cartão para gastos variáveis (fatura) */}
+            {!isFixed && creditCards.length > 0 && (
+              <div>
+                <label className="text-xs text-[#9090A8] font-medium mb-2 block">
+                  Cartão <span className="text-[#5C5C72]">(opcional — use para lançar fatura)</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedCardId(null)}
+                    className={`px-3 py-2 text-xs rounded-xl transition-all border ${
+                      selectedCardId === null
+                        ? 'bg-[#6C63FF]/20 text-[#6C63FF] border-[#6C63FF]/40'
+                        : 'bg-bg-overlay text-[#9090A8] border-transparent'
+                    }`}
+                  >
+                    Nenhum
+                  </button>
+                  {creditCards.map(card => (
+                    <button
+                      key={card.id}
+                      onClick={() => setSelectedCardId(card.id)}
+                      className={`px-3 py-2 text-xs rounded-xl transition-all border ${
+                        selectedCardId === card.id
+                          ? 'bg-[#6C63FF]/20 text-[#6C63FF] border-[#6C63FF]/40'
+                          : 'bg-bg-overlay text-[#9090A8] border-transparent'
+                      }`}
+                    >
+                      {card.name}{card.last_four ? ` ••${card.last_four}` : ''}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Bell } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -7,12 +8,21 @@ import BalanceCard from '../components/dashboard/BalanceCard'
 import CategoryChart from '../components/dashboard/CategoryChart'
 import QuickStats from '../components/dashboard/QuickStats'
 import JurosBar from '../components/dashboard/JurosBar'
+import FaturaAlert from '../components/dashboard/FaturaAlert'
+import AddExpenseModal from '../components/expenses/AddExpenseModal'
 import { getInitials } from '../lib/utils'
 import { MONTHS } from '../lib/types'
 
 export default function DashboardPage() {
   const { profile } = useAuth()
-  const { expenses, income, receivables, investments, currentMonth, currentYear, setCurrentMonth, setCurrentYear, loading } = useApp()
+  const { expenses, income, receivables, investments, creditCards, currentMonth, currentYear, setCurrentMonth, setCurrentYear, loading } = useApp()
+  const [faturaModalOpen, setFaturaModalOpen] = useState(false)
+  const [faturaCardId, setFaturaCardId] = useState<string | null>(null)
+
+  function handleLancarFatura(cardId: string) {
+    setFaturaCardId(cardId)
+    setFaturaModalOpen(true)
+  }
 
   // Previsão = total de todas as despesas do mês (pago + a pagar)
   const totalForecast = expenses.reduce((s, e) => s + Number(e.amount), 0)
@@ -55,6 +65,15 @@ export default function DashboardPage() {
         />
 
         <div className="mt-3 space-y-3">
+          {/* Fatura Alert */}
+          <FaturaAlert
+            creditCards={creditCards}
+            expenses={expenses}
+            currentMonth={currentMonth}
+            currentYear={currentYear}
+            onLancarFatura={handleLancarFatura}
+          />
+
           {/* Balance Hero Card */}
           <BalanceCard totalPaid={totalPaid} totalForecast={totalForecast} totalIncome={totalIncome} />
 
@@ -85,6 +104,13 @@ export default function DashboardPage() {
               </div>
             </motion.div>
           )}
+
+          {/* Modal para lançar fatura */}
+          <AddExpenseModal
+            open={faturaModalOpen}
+            onClose={() => { setFaturaModalOpen(false); setFaturaCardId(null) }}
+            initialCardId={faturaCardId}
+          />
 
           {/* Empty state */}
           {!loading && expenses.length === 0 && income.length === 0 && (
