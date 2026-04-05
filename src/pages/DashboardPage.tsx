@@ -109,6 +109,7 @@ export default function DashboardPage() {
           <AddExpenseModal
             open={faturaModalOpen}
             onClose={() => { setFaturaModalOpen(false); setFaturaCardId(null) }}
+            initialTab="fatura"
             initialCardId={faturaCardId}
           />
 
