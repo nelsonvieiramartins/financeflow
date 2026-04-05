@@ -18,12 +18,12 @@ type Tab = 'dashboard' | 'lancamentos' | 'categorias' | 'perfil'
 function AppContent() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [modalOpen, setModalOpen] = useState(false)
-  const [modalTab, setModalTab] = useState<EntryType>('expense')
+  const [modalTab, setModalTab] = useState<EntryType | undefined>(undefined)
   const [editExpense, setEditExpense] = useState<Expense | null>(null)
 
-  function openAdd(tab: EntryType = 'expense') {
+  function openAdd(tab?: EntryType) {
     setEditExpense(null)
-    setModalTab(tab)
+    setModalTab(tab)      // undefined = mostra seleção de tipo; valor = pula direto
     setModalOpen(true)
   }
 
