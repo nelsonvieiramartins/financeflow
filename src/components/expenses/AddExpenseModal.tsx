@@ -186,6 +186,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       }
 
       if (editExpense) {
+        // updateExpense permanece awaited — precisa de confirmação antes de fechar
         await updateExpense(editExpense.id, {
           description: description.trim(),
           amount,
@@ -199,7 +200,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
         })
       } else if (tab === 'expense') {
-        await addExpense({
+        addExpense({
           description: description.trim(),
           amount,
           category,
@@ -218,7 +219,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           credit_card_id: paymentMethod === 'cartao_fixo' ? selectedCardId : null,
         })
       } else if (tab === 'income') {
-        await addIncome({
+        addIncome({
           description: description.trim(),
           amount,
           source: incomeSource,
@@ -228,7 +229,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
         })
       } else if (tab === 'receivable') {
         if (!fromPerson.trim()) { setError('Informe quem irá pagar.'); setLoading(false); return }
-        await addReceivable({
+        addReceivable({
           description: description.trim(),
           amount,
           from_person: fromPerson.trim(),
@@ -237,7 +238,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           year: currentYear,
         })
       } else if (tab === 'investment') {
-        await addInvestment({
+        addInvestment({
           description: description.trim(),
           amount,
           month: currentMonth,
@@ -250,7 +251,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
         const faturaDate = faturaVencimentoDay > 0
           ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(faturaVencimentoDay).padStart(2, '0')}`
           : null
-        await addExpense({
+        addExpense({
           description: `Fatura ${card?.name ?? 'Cartão'}`,
           amount,
           category: 'outros',

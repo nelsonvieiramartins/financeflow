@@ -16,17 +16,17 @@ interface AppContextType {
   creditCards: CreditCard[]
   loading: boolean
   refresh: () => void
-  addExpense: (data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  addExpense: (data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
   updateExpense: (id: string, data: Partial<Expense>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
   deleteRecurringGroup: (groupId: string, fromMonth: number, fromYear: number) => Promise<void>
-  addIncome: (data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  addIncome: (data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
   updateIncome: (id: string, data: Partial<Income>) => Promise<void>
   deleteIncome: (id: string) => Promise<void>
-  addReceivable: (data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  addReceivable: (data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
   updateReceivable: (id: string, data: Partial<Receivable>) => Promise<void>
   deleteReceivable: (id: string) => Promise<void>
-  addInvestment: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  addInvestment: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void
   deleteInvestment: (id: string) => Promise<void>
   addCreditCard: (data: Omit<CreditCard, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateCreditCard: (id: string, data: Partial<CreditCard>) => Promise<void>
@@ -101,20 +101,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user, debouncedFetch])
 
   // ---- Expense CRUD ----
-  async function addExpense(data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  function addExpense(data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
 
-    if (data.is_recurring && data.recurring_group_id) {
-      // Bulk insert: fire-and-forget para não bloquear o modal.
-      // Realtime (debouncedFetch) sincroniza o estado após os inserts.
-      const rows = buildRecurringRows(data, user.id)
-      supabase.from('expenses').insert(rows).then(({ error }) => {
-        if (error) console.error('Recurring insert error:', error.message)
-      })
-    } else {
-      const { error } = await supabase.from('expenses').insert({ ...data, user_id: user.id })
-      if (error) throw new Error(error.message)
-    }
+    // Sempre fire-and-forget: o modal fecha imediatamente,
+    // o Realtime (debouncedFetch) sincroniza o estado local.
+    const rows = data.is_recurring && data.recurring_group_id
+      ? buildRecurringRows(data, user.id)
+      : [{ ...data, user_id: user.id }]
+
+    supabase.from('expenses').insert(rows).then(({ error }) => {
+      if (error) console.error('addExpense error:', error.message)
+    })
   }
 
   function buildRecurringRows(
@@ -178,10 +176,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   // ---- Income CRUD ----
-  async function addIncome(data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  function addIncome(data: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    const { error } = await supabase.from('income').insert({ ...data, user_id: user.id })
-    if (error) throw new Error(error.message)
+    supabase.from('income').insert({ ...data, user_id: user.id }).then(({ error }) => {
+      if (error) console.error('addIncome error:', error.message)
+    })
   }
 
   async function updateIncome(id: string, data: Partial<Income>) {
@@ -196,10 +195,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   // ---- Receivables CRUD ----
-  async function addReceivable(data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  function addReceivable(data: Omit<Receivable, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    const { error } = await supabase.from('receivables').insert({ ...data, user_id: user.id })
-    if (error) throw new Error(error.message)
+    supabase.from('receivables').insert({ ...data, user_id: user.id }).then(({ error }) => {
+      if (error) console.error('addReceivable error:', error.message)
+    })
   }
 
   async function updateReceivable(id: string, data: Partial<Receivable>) {
@@ -214,10 +214,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   // ---- Investments CRUD ----
-  async function addInvestment(data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  function addInvestment(data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
-    const { error } = await supabase.from('investments').insert({ ...data, user_id: user.id })
-    if (error) throw new Error(error.message)
+    supabase.from('investments').insert({ ...data, user_id: user.id }).then(({ error }) => {
+      if (error) console.error('addInvestment error:', error.message)
+    })
   }
 
   async function deleteInvestment(id: string) {
