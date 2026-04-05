@@ -26,7 +26,16 @@ export default function AuthPage() {
 
     if (mode === 'login') {
       const { error } = await signIn(email, password)
-      if (error) setError('Email ou senha inválidos.')
+      if (error) {
+        const msg = error.message.toLowerCase()
+        if (msg.includes('rate limit') || msg.includes('too many')) {
+          setError('Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.')
+        } else if (msg.includes('email not confirmed')) {
+          setError('Email não confirmado. Verifique sua caixa de entrada e clique no link de ativação.')
+        } else {
+          setError('Email ou senha inválidos.')
+        }
+      }
 
     } else if (mode === 'register') {
       if (!name.trim()) { setError('Informe seu nome.'); setLoading(false); return }
@@ -34,7 +43,16 @@ export default function AuthPage() {
       if (password.length < 6) { setError('A senha deve ter pelo menos 6 caracteres.'); setLoading(false); return }
       const { error } = await signUp(email, password, name)
       if (error) {
-        setError(error.message)
+        const msg = error.message.toLowerCase()
+        if (msg.includes('rate limit')) {
+          setError('Muitas tentativas de cadastro. Aguarde alguns minutos e tente novamente.')
+        } else if (msg.includes('already registered') || msg.includes('already exists')) {
+          setError('Este email já está cadastrado. Tente fazer login.')
+        } else if (msg.includes('invalid email')) {
+          setError('Email inválido. Verifique o endereço informado.')
+        } else {
+          setError('Erro ao criar conta. Tente novamente.')
+        }
       } else {
         setRegisteredEmail(email)
         setSuccess('ok')
