@@ -69,10 +69,10 @@ function calcCardBillingMonth(purchaseDateStr: string, closingDay: number): { mo
   return { month: m, year: y }
 }
 
-export default function AddExpenseModal({ open, onClose, editExpense, initialTab = 'expense', initialCardId = null }: Props) {
+export default function AddExpenseModal({ open, onClose, editExpense, initialTab, initialCardId = null }: Props) {
   const { addExpense, updateExpense, addIncome, addReceivable, addInvestment, currentMonth, currentYear, creditCards, expenses } = useApp()
 
-  const [tab, setTab] = useState<EntryType>('expense')
+  const [tab, setTab] = useState<EntryType | null>(null)
   const [amountStr, setAmountStr] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<ExpenseCategory>('outros')
@@ -125,7 +125,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       }
     } else {
       resetForm()
-      setTab(initialTab)
+      setTab(initialTab ?? null)
       if (initialCardId) setSelectedCardId(initialCardId)
     }
   }, [editExpense, open, initialTab, initialCardId])
@@ -163,6 +163,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
 
   async function handleSubmit() {
     setError('')
+    if (!tab) { setError('Selecione o tipo de lançamento.'); return }
     if (tab !== 'fatura' && !description.trim()) { setError('Informe a descrição.'); return }
     const amount = getAmount()
     if (amount <= 0) { setError('Informe um valor válido.'); return }
@@ -310,6 +311,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
   const cardExpensesTotal = cardExpenses.reduce((s, e) => s + e.amount, 0)
 
   const sectionLabel = (() => {
+    if (!tab) return null
     if (tab === 'fatura') {
       const card = selectedCardId ? creditCards.find(c => c.id === selectedCardId) : null
       return card ? `Fatura · ${card.name}` : 'Fatura'
@@ -324,8 +326,28 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
     <BottomSheet open={open} onClose={handleClose} title={editExpense ? 'Editar Lançamento' : 'Novo Lançamento'}>
       <div className="space-y-4">
 
-        {/* Entry type tabs */}
-        {!editExpense && (
+        {/* Seleção de tipo — cards grandes quando nenhum tipo escolhido */}
+        {!editExpense && !tab && (
+          <div>
+            <p className="text-xs text-[#9090A8] font-medium mb-3 text-center">Qual tipo de lançamento?</p>
+            <div className="grid grid-cols-2 gap-2">
+              {ENTRY_TABS.map(t => (
+                <motion.button
+                  key={t.id}
+                  onClick={() => { setTab(t.id); setError('') }}
+                  whileTap={{ scale: 0.96 }}
+                  className="flex flex-col items-center gap-2 py-5 rounded-2xl bg-bg-overlay border border-white/8 transition-all hover:border-primary/40"
+                >
+                  <span className="text-3xl leading-none">{t.emoji}</span>
+                  <span className="text-sm font-semibold text-white">{t.label}</span>
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tabs compactos — apenas após tipo escolhido */}
+        {!editExpense && tab && (
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {ENTRY_TABS.map(t => (
               <button
@@ -342,7 +364,7 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
         )}
 
         {/* Valor */}
-        <div className="bg-bg-overlay rounded-2xl p-4 text-center">
+        <div className="bg-bg-overlay rounded-2xl p-4 text-center" style={{ display: (tab || editExpense) ? undefined : 'none' }}>
           {sectionLabel && (
             <p className="text-[10px] text-primary font-medium uppercase tracking-wider mb-1">{sectionLabel}</p>
           )}
@@ -360,8 +382,9 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           </div>
         </div>
 
+        {/* Campos + botão — só visíveis após escolher o tipo */}
         {/* Descrição — oculta na aba Fatura */}
-        {tab !== 'fatura' && (
+        {(tab && tab !== 'fatura') && (
           <div>
             <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Descrição</label>
             <input
@@ -794,31 +817,35 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           </div>
         )}
 
-        {/* Observações */}
-        <div>
-          <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Observações (opcional)</label>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Detalhes adicionais..."
-            rows={2}
-            className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors resize-none"
-          />
-        </div>
+        {(tab || editExpense) && (
+          <>
+            {/* Observações */}
+            <div>
+              <label className="text-xs text-[#9090A8] font-medium mb-1.5 block">Observações (opcional)</label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Detalhes adicionais..."
+                rows={2}
+                className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors resize-none"
+              />
+            </div>
 
-        {error && (
-          <p className="text-xs text-[#F87171] bg-[#F87171]/10 border border-[#F87171]/20 rounded-xl px-4 py-3">
-            {error}
-          </p>
+            {error && (
+              <p className="text-xs text-[#F87171] bg-[#F87171]/10 border border-[#F87171]/20 rounded-xl px-4 py-3">
+                {error}
+              </p>
+            )}
+
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="w-full bg-gradient-primary text-white font-semibold py-4 rounded-xl shadow-glow-primary transition-all active:scale-95 disabled:opacity-60"
+            >
+              {loading ? 'Salvando...' : editExpense ? 'Salvar alterações' : 'Adicionar lançamento'}
+            </button>
+          </>
         )}
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="w-full bg-gradient-primary text-white font-semibold py-4 rounded-xl shadow-glow-primary transition-all active:scale-95 disabled:opacity-60"
-        >
-          {loading ? 'Salvando...' : editExpense ? 'Salvar alterações' : 'Adicionar lançamento'}
-        </button>
       </div>
     </BottomSheet>
   )
