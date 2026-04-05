@@ -37,6 +37,25 @@ function todayStr() {
   return new Date().toISOString().split('T')[0]
 }
 
+/**
+ * Calcula o mês/ano de vencimento da fatura.
+ * Se closingDay > dueDay, o vencimento cai no mês seguinte ao fechamento.
+ * Ex: fecha dia 24, vence dia 4 → vencimento é no mês seguinte.
+ */
+function calcFaturaDueMonth(
+  billingMonth: number,
+  billingYear: number,
+  closingDay: number,
+  dueDay: number,
+): { dueMonth: number; dueYear: number } {
+  if (closingDay > 0 && dueDay > 0 && closingDay > dueDay) {
+    const nextM = billingMonth === 12 ? 1 : billingMonth + 1
+    const nextY = billingMonth === 12 ? billingYear + 1 : billingYear
+    return { dueMonth: nextM, dueYear: nextY }
+  }
+  return { dueMonth: billingMonth, dueYear: billingYear }
+}
+
 /** Dado uma data de compra e o dia de fechamento do cartão,
  *  retorna o mês/ano em que a compra cai na fatura. */
 function calcCardBillingMonth(purchaseDateStr: string, closingDay: number): { month: number; year: number } {
@@ -248,8 +267,13 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
       } else if (tab === 'fatura') {
         if (!selectedCardId) { setError('Selecione um cartão.'); setLoading(false); return }
         const card = creditCards.find(c => c.id === selectedCardId)
+        const { dueMonth, dueYear } = calcFaturaDueMonth(
+          currentMonth, currentYear,
+          card ? getCardClosingDay(card.due_day, card.closing_day) : 0,
+          faturaVencimentoDay,
+        )
         const faturaDate = faturaVencimentoDay > 0
-          ? `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(faturaVencimentoDay).padStart(2, '0')}`
+          ? `${dueYear}-${String(dueMonth).padStart(2, '0')}-${String(faturaVencimentoDay).padStart(2, '0')}`
           : null
         await addExpense({
           description: `Fatura ${card?.name ?? 'Cartão'}`,
@@ -258,8 +282,8 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
           payment_type: paymentMethod as PaymentType,
           is_recurring: false,
           due_date: faturaDate,
-          month: currentMonth,
-          year: currentYear,
+          month: dueMonth,
+          year: dueYear,
           notes: notes || null,
           sort_order: 0,
           recurring_group_id: null,
@@ -459,11 +483,18 @@ export default function AddExpenseModal({ open, onClose, editExpense, initialTab
                 max={31}
                 className="w-full bg-bg-overlay border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder-[#5C5C72] focus:outline-none focus:border-primary transition-colors"
               />
-              {faturaVencimentoDay > 0 && (
-                <p className="text-[10px] text-[#5C5C72] mt-1.5">
-                  Vence dia {faturaVencimentoDay} de {MONTHS[currentMonth - 1]} {currentYear}
-                </p>
-              )}
+              {faturaVencimentoDay > 0 && (() => {
+                const card = selectedCardId ? creditCards.find(c => c.id === selectedCardId) : null
+                const closingDay = card ? getCardClosingDay(card.due_day, card.closing_day) : 0
+                const { dueMonth, dueYear } = calcFaturaDueMonth(currentMonth, currentYear, closingDay, faturaVencimentoDay)
+                const shifted = dueMonth !== currentMonth || dueYear !== currentYear
+                return (
+                  <p className={`text-[10px] mt-1.5 ${shifted ? 'text-[#FF9A3C]' : 'text-[#5C5C72]'}`}>
+                    {shifted && '⚠ Virada de mês → '}
+                    Vence dia {faturaVencimentoDay} de {MONTHS[dueMonth - 1]} {dueYear}
+                  </p>
+                )
+              })()}
             </div>
           </>
         )}
