@@ -287,7 +287,7 @@ export default function PerfilPage() {
         </div>
 
         <p className="text-center text-[10px] text-[#5C5C72] mt-4 px-4">
-          FinanceFlow v1.0 · Seus dados são privados e seguros
+          FinanceFlow v1.1 · Seus dados são privados e seguros
         </p>
       </div>
 
