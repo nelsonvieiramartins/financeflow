@@ -104,14 +104,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   function addExpense(data: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
     if (!user) return
 
-    // Sempre fire-and-forget: o modal fecha imediatamente,
-    // o Realtime (debouncedFetch) sincroniza o estado local.
     const rows = data.is_recurring && data.recurring_group_id
       ? buildRecurringRows(data, user.id)
       : [{ ...data, user_id: user.id }]
 
     supabase.from('expenses').insert(rows).then(({ error }) => {
-      if (error) console.error('addExpense error:', error.message)
+      if (error) {
+        console.error('addExpense error:', error.message)
+      }
+      // Sempre atualiza o estado, independente do Realtime
+      debouncedFetch()
     })
   }
 
@@ -180,6 +182,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return
     supabase.from('income').insert({ ...data, user_id: user.id }).then(({ error }) => {
       if (error) console.error('addIncome error:', error.message)
+      debouncedFetch()
     })
   }
 
@@ -199,6 +202,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return
     supabase.from('receivables').insert({ ...data, user_id: user.id }).then(({ error }) => {
       if (error) console.error('addReceivable error:', error.message)
+      debouncedFetch()
     })
   }
 
@@ -218,6 +222,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return
     supabase.from('investments').insert({ ...data, user_id: user.id }).then(({ error }) => {
       if (error) console.error('addInvestment error:', error.message)
+      debouncedFetch()
     })
   }
 
