@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mail, Lock, User, Eye, EyeOff, TrendingUp } from 'lucide-react'
+import { Mail, Lock, User, Eye, EyeOff, TrendingUp, MailCheck } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
 export default function AuthPage() {
   const { signIn, signUp } = useAuth()
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'confirm'>('login')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -16,6 +16,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [registeredEmail, setRegisteredEmail] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -32,8 +33,12 @@ export default function AuthPage() {
       if (password !== confirmPassword) { setError('As senhas não coincidem.'); setLoading(false); return }
       if (password.length < 6) { setError('A senha deve ter pelo menos 6 caracteres.'); setLoading(false); return }
       const { error } = await signUp(email, password, name)
-      if (error) setError(error.message)
-      else setSuccess('Conta criada com sucesso!')
+      if (error) {
+        setError(error.message)
+      } else {
+        setRegisteredEmail(email)
+        setMode('confirm')
+      }
 
     } else if (mode === 'forgot') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -72,8 +77,70 @@ export default function AuthPage() {
           <p className="text-sm text-[#9090A8] mt-1">Seus gastos, sob controle</p>
         </div>
 
+        {/* ── Tela de confirmação de email ── */}
+        <AnimatePresence>
+          {mode === 'confirm' && (
+            <motion.div
+              key="confirm"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.3 }}
+              className="text-center"
+            >
+              <div className="flex justify-center mb-5">
+                <div className="w-20 h-20 bg-[#34D399]/15 border border-[#34D399]/30 rounded-3xl flex items-center justify-center">
+                  <MailCheck className="w-10 h-10 text-[#34D399]" strokeWidth={1.5} />
+                </div>
+              </div>
+
+              <h2 className="text-xl font-bold text-white mb-2">Confirme seu email</h2>
+              <p className="text-sm text-[#9090A8] leading-relaxed mb-1">
+                Enviamos um link de ativação para:
+              </p>
+              <p className="text-sm font-semibold text-primary mb-5 break-all">
+                {registeredEmail}
+              </p>
+
+              <div className="bg-bg-overlay border border-white/8 rounded-2xl p-4 mb-6 text-left space-y-2.5">
+                {[
+                  'Abra o email que acabamos de enviar',
+                  'Clique no link "Confirmar email"',
+                  'Após confirmar, volte aqui e faça login',
+                ].map((step, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    <p className="text-xs text-[#9090A8]">{step}</p>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => switchMode('login')}
+                className="w-full bg-gradient-primary text-white font-semibold py-3.5 rounded-xl shadow-glow-primary transition-all duration-200 active:scale-95"
+              >
+                Ir para o login
+              </button>
+
+              <p className="text-xs text-[#5C5C72] mt-4">
+                Não recebeu?{' '}
+                <button
+                  onClick={async () => {
+                    await supabase.auth.resend({ type: 'signup', email: registeredEmail })
+                  }}
+                  className="text-primary underline underline-offset-2"
+                >
+                  Reenviar email
+                </button>
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Mode tabs (only login / register) */}
-        {mode !== 'forgot' && (
+        {mode !== 'forgot' && mode !== 'confirm' && (
           <div className="flex bg-bg-surface rounded-xl p-1 mb-6 border border-white/5">
             {(['login', 'register'] as const).map(m => (
               <button
@@ -102,7 +169,7 @@ export default function AuthPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className={`space-y-4 ${mode === 'confirm' ? 'hidden' : ''}`}>
           {/* Name field (register only) */}
           <AnimatePresence>
             {mode === 'register' && (
